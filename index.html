@@ -47,9 +47,23 @@
     </div>
     <div class="row">
       <button class="btn gold" id="btn-auto">Auto-Plan aus Favoriten</button>
+      <button class="btn gold" id="btn-auto-vote">Auto-Plan aus Abstimmung</button>
       <button class="btn" id="btn-share">Teilen</button>
     </div>
     <div id="plan"></div>
+  </section>
+
+  <section id="view-cash" class="view">
+    <h2 class="sec">Kronen-Umrechner</h2>
+    <div class="row"><label>Euro<input id="cv-eur" type="text" inputmode="decimal"></label><label>Kronen (Kč)<input id="cv-czk" type="text" inputmode="decimal"></label></div>
+    <div class="hint" id="rate"></div>
+    <h2 class="sec">Groschen-Kasse</h2>
+    <div class="row"><label>Was<input id="x-what" type="text" maxlength="40" placeholder="z. B. Abendessen"></label></div>
+    <div class="row"><label>Betrag<input id="x-amt" type="text" inputmode="decimal"></label><label>Währung<select id="x-cur"><option>Kč</option><option>€</option></select></label></div>
+    <div class="row"><label>Bezahlt von<select id="x-payer"></select></label></div>
+    <div class="chips-wrap" id="x-for"></div>
+    <button class="btn gold" id="x-add" style="width:100%;margin-top:6px">Eintragen</button>
+    <div id="cash-out"></div>
   </section>
 
   <section id="view-quest" class="view">
@@ -61,9 +75,11 @@
   <button data-view="map" class="active"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg></span>Karte</button>
   <button data-view="list"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>Entdecken</button>
   <button data-view="plan"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zM9 8h6M9 12h6M9 16h4"/></svg></span>Plan</button>
+  <button data-view="cash"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.6-1.5-3-1.5-1.8 0-3 1-3 2.3s1.2 2 3 2.4 3 1.1 3 2.4-1.2 2.4-3 2.4c-1.4 0-2.5-.6-3-1.6M12 6.5v1.5M12 16v1.5"/></svg></span>Kasse</button>
   <button data-view="quest"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg></span>Quest</button>
 </nav>
 
+<input type="file" id="photo-in" accept="image/*" capture="environment" hidden>
 <div id="sheet" class="sheet" hidden>
   <div class="sheet-body" id="sheet-body"></div>
 </div>
