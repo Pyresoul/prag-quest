@@ -418,22 +418,28 @@ $('#btn-share').onclick = async () => {
 };
 
 // ---------- Würfel ----------
-$('#btn-dice').onclick = () => {
-  const pool = PLACES.filter(p => p.cat !== 'kcd' && matches(p, ['bar', 'veg', 'vegan'].includes(S.filter) ? S.filter : 'all'));
-  const roll = () => {
-    const p = pool[Math.floor(Math.random() * pool.length)];
-    $('#sheet-body').innerHTML = `<h2>Das Schicksal wählt…</h2><div class="dice roll">${rabbit('mustard', 'trumpet', 'rb-dice')}</div>` + card(p) +
-      `<div class="row"><button class="btn gold" id="again">Nochmal würfeln</button><button class="btn" id="sheet-close">Schließen</button></div>`;
-    hydrate($('#sheet-body'));
-    $('#sheet-body').onclick = e => {
-      if (e.target.id === 'again') return roll();
-      if (e.target.id === 'sheet-close') return closeSheet();
-      const b = e.target.closest('[data-a]'); if (!b) return;
-      ACT[b.dataset.a](p.id);
-    };
+const DICE_CATS = [['all', 'Alles'], ['food', 'Restaurant'], ['bar', 'Bar'], ['vegan', 'Vegan'], ['kcd', 'KCD-Ort'], ['trip', 'Ausflug']];
+let diceCat = 'all';
+const dicePool = c => PLACES.filter(p => isPlace(p) && (c === 'all' || (c === 'food' && p.cat === 'food') || (c === 'bar' && p.cat === 'bar') ||
+  (c === 'vegan' && p.diet === 'vegan') || (c === 'kcd' && p.cat === 'kcd') || (c === 'trip' && isTrip(p))));
+function rollDice() {
+  const pool = dicePool(diceCat), p = pool[Math.floor(Math.random() * pool.length)];
+  $('#sheet-body').innerHTML = `<h2>Das Schicksal wählt…</h2>
+    <div class="chips dice-chips">${DICE_CATS.map(([k, l]) => `<button class="chip ${diceCat === k ? 'on' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
+    <div class="dice roll">${rabbit('mustard', 'trumpet', 'rb-dice')}</div>` + card(p) +
+    `<div class="row"><button class="btn gold" id="again">Nochmal würfeln</button><button class="btn" id="sheet-close">Schließen</button></div>`;
+  hydrate($('#sheet-body'));
+  $('#sheet-body').onclick = e => {
+    const c = e.target.dataset.c; if (c) { diceCat = c; return rollDice(); }
+    if (e.target.id === 'again') return rollDice();
+    if (e.target.id === 'sheet-close') return closeSheet();
+    const im = e.target.closest('.myphoto img'); if (im) return viewPhoto(p.id);
+    const b = e.target.closest('[data-a]'); if (!b) return;
+    ACT[b.dataset.a](p.id);
+    if (['fav', 'up', 'down'].includes(b.dataset.a)) { $('#sheet-body article').outerHTML = card(p); hydrate($('#sheet-body')); }
   };
-  roll(); $('#sheet').hidden = false;
-};
+}
+$('#btn-dice').onclick = () => { rollDice(); $('#sheet').hidden = false; };
 $('#btn-phrases').onclick = () => show('lang');
 
 // ---------- Sprache (Tschechisch) ----------

@@ -207,3 +207,4 @@ input[type=search]{background:var(--parch) var(--paper);color:var(--ink);border:
 .cz-big{text-align:center;padding:24px 8px;background:var(--parch) var(--paper);color:var(--ink);border:3px double var(--ink2);margin-bottom:12px}
 .cz-big-cs{font:700 34px/1.15 var(--display);word-break:break-word}.cz-big-de{margin-top:12px;font:italic 18px var(--body);color:var(--ink2)}
 .tabs button{font-size:9px;letter-spacing:.5px}
+.dice-chips{position:static!important;margin:0 -16px 6px;height:auto;padding:4px 12px;background:none}
