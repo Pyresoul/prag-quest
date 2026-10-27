@@ -4,11 +4,12 @@
 const PLACES = window.PLACES;
 const rabbit = window.rabbit;
 const BY_ID = Object.fromEntries(PLACES.map(p => [p.id, p]));
-const CAT = { kcd: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/></svg></span>', label: 'KCD', color: '#c4ae3a' }, bar: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>', label: 'Bar', color: '#c4503b' }, food: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/></svg></span>', label: 'Essen', color: '#7fa95c' } };
-const FILTERS = [['all', 'Alle'], ['kcd', 'KCD'], ['trip', 'Ausflug'], ['city', 'Prag'], ['bar', 'Bars'], ['veg', 'Veggie'], ['vegan', 'Vegan'], ['top', 'Beliebt']];
+const CAT = { kcd: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/></svg></span>', label: 'KCD', color: '#c4ae3a' }, bar: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>', label: 'Bar', color: '#c4503b' }, sight: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10M3 10l9-6 9 6z"/></svg></span>', label: 'Sehenswert', color: '#6f95ad' }, food: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/></svg></span>', label: 'Essen', color: '#7fa95c' } };
+const FILTERS = [['all', 'Alle'], ['kcd', 'KCD'], ['sight', 'Sehen'], ['trip', 'Ausflug'], ['city', 'Prag'], ['bar', 'Bars'], ['veg', 'Veggie'], ['vegan', 'Vegan'], ['top', 'Beliebt']];
 const FICON = {
   all: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>',
   kcd: '<path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/>',
+  sight: '<path d="M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10M3 10l9-6 9 6z"/>',
   trip: '<path d="M5 19L19 5M10 5h9v9"/>',
   city: '<path d="M6 21V9l3-2 3 2 3-2 3 2v12zM10 21v-5h4v5"/>',
   bar: '<path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2"/>',
@@ -16,7 +17,7 @@ const FICON = {
   vegan: '<path d="M12 21V10M12 10C12 6 9 4 5 4c0 4 2 6 7 6zM12 13c0-3 2-5 6-5 0 4-2 5-6 5z"/>',
   top: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'
 };
-const RANKS = [[0, 'Bauernjunge'], [4, 'Knecht'], [9, 'Knappe'], [15, 'Söldner'], [22, 'Ritter'], [30, 'Held von Böhmen']];
+const RANKS = [[0, 'Bauernjunge'], [5, 'Knecht'], [12, 'Knappe'], [20, 'Söldner'], [32, 'Ritter'], [48, 'Held von Böhmen']];
 const KEY = 'prag-quest.v1';
 const PRAGUE = [50.0875, 14.4213];
 
@@ -34,7 +35,7 @@ if (!S.by) { S.by = Math.random().toString(36).slice(2, 10); store(); }
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const isTrip = p => !!p.trip;
-const matches = (p, f) => f === 'all' || (f === 'kcd' && p.cat === 'kcd') || (f === 'bar' && p.cat === 'bar') ||
+const matches = (p, f) => f === 'all' || (f === 'kcd' && p.cat === 'kcd') || (f === 'sight' && p.cat === 'sight') || (f === 'bar' && p.cat === 'bar') ||
   (f === 'veg' && p.cat === 'food') || (f === 'vegan' && p.diet === 'vegan') || (f === 'city' && !isTrip(p)) || (f === 'trip' && isTrip(p)) || (f === 'top' && score(p.id) > 0);
 function km(a, b) {
   const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
@@ -107,7 +108,7 @@ const IMG_KEY = 'prag-quest.img.v1';
 let IMGS = {}; try { IMGS = JSON.parse(localStorage.getItem(IMG_KEY)) || {}; } catch (_) {}
 const saveImgs = () => { try { localStorage.setItem(IMG_KEY, JSON.stringify(IMGS)); } catch (_) {} };
 const POSE_FOR = p => p.trip ? 'attack' : p.cat === 'kcd' ? (p.epoch ? 'walk' : 'guard') : p.cat === 'bar' ? 'trumpet' : 'peek';
-const rabbitOf = p => { const i = Math.max(0, PLACES.indexOf(p)); return [window.RABBIT_COLORS[i % 5], window.RABBIT_POSES[Math.floor(i / 5) % 10]]; };
+const rabbitOf = p => { const i = Math.max(0, PLACES.indexOf(p)); const n = window.RABBIT_COLORS.length; return [window.RABBIT_COLORS[i % n], window.RABBIT_POSES[Math.floor(i / n) % 10]]; };
 const RB_FOR = rabbitOf;
 const imgTag = m => `<img loading="lazy" alt="" src="${esc(m.src)}" data-alt="${esc(m.alt || '')}"><a class="credit" href="${esc(m.page)}" target="_blank" rel="noopener">Foto: Wikipedia</a>`;
 function picHTML(p) {
@@ -142,7 +143,7 @@ const mapsQ = p => encodeURIComponent(`${p.name} ${p.area} Tschechien`);
 const linksHTML = p => !isPlace(p) ? '' : `<div class="actions links">
   <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${mapsQ(p)}">Google Maps</a>
   <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking">Route</a>
-  <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${mapsQ(p)}">Fotos</a></div>`;
+  <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${mapsQ(p)}">Fotos</a>${p.web ? `<a class="btn small" target="_blank" rel="noopener" href="${esc(p.web)}">Website</a>` : ''}</div>`;
 
 // ---------- Gruppe: Mitglieder, Stimmen, Notizen, Zeiten ----------
 const nameOf = id => ((S.entries['m:' + id] || {}).v || {}).n || 'Unbekannt';
@@ -203,7 +204,7 @@ const ACT = {
   up: id => vote(id, 'u'), down: id => vote(id, 'd'), note: id => openNote(id), photo: id => takePhoto(id), hours: id => openHours(id), beer: id => openBeer(id)
 };
 let selId = null;
-const GROUPS = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Essen & Veggie']];
+const GROUPS = [['kcd', 'KCD-Schauplätze'], ['sight', 'Sehenswürdigkeiten'], ['bar', 'Bars & Brauereien'], ['food', 'Essen & Veggie']];
 function rowHTML(p) {
   const sel = selId === p.id, sc = score(p.id);
   const mark = [S.visited.includes(p.id) ? '✓' : '', S.fav.includes(p.id) ? '★' : '', sc > 0 ? '▲' + sc : ''].filter(Boolean).join(' ');
@@ -300,7 +301,7 @@ function showUnlock(p) {
 
 // ---------- Öffnungszeiten (von der Gruppe eingetragen) ----------
 const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], WD = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-const hoursOf = id => (S.entries['h:' + id] || {}).v || null;
+const hoursOf = id => { const e = S.entries['h:' + id]; return e ? e.v : (BY_ID[id].h || null); };
 const hoursText = h => [h.o && h.e ? `${h.o}–${h.e}` : '', (h.c || []).length ? 'geschlossen: ' + h.c.map(d => DAYS[d]).join(', ') : '', h.n || ''].filter(Boolean).join(' · ');
 function openState(h, now = new Date()) {
   const d = now.getDay();
@@ -318,7 +319,7 @@ function hoursHTML(p) {
   const h = hoursOf(p.id);
   if (!h) return p.hint ? `<div class="hours hintline">${esc(p.hint)}</div>` : '';
   const st = openState(h);
-  return `<div class="hours"><b>Zeiten</b> ${esc(hoursText(h))}${h.s === 'osm' ? ' <small>(OSM)</small>' : ''}${st ? ` <span class="st ${st.open ? 'on' : 'off'}">${st.open ? 'Jetzt geöffnet' : 'Jetzt zu'} · ${esc(st.msg)}</span>` : ''}</div>`;
+  return `<div class="hours"><b>Zeiten</b> ${esc(hoursText(h))}${h.s === 'osm' ? ' <small>(OSM)</small>' : h.s === 'web' ? ' <small>(Web, bitte prüfen)</small>' : ''}${st ? ` <span class="st ${st.open ? 'on' : 'off'}">${st.open ? 'Jetzt geöffnet' : 'Jetzt zu'} · ${esc(st.msg)}</span>` : ''}</div>`;
 }
 function openHours(id) {
   const h = hoursOf(id) || { c: [], o: '', e: '', n: '' }, closed = new Set(h.c || []);
@@ -652,10 +653,10 @@ $('#btn-share').onclick = async () => {
 };
 
 // ---------- Würfel ----------
-const DICE_CATS = [['all', 'Alles'], ['food', 'Restaurant'], ['bar', 'Bar'], ['vegan', 'Vegan'], ['kcd', 'KCD-Ort'], ['trip', 'Ausflug']];
+const DICE_CATS = [['all', 'Alles'], ['food', 'Restaurant'], ['bar', 'Bar'], ['vegan', 'Vegan'], ['kcd', 'KCD-Ort'], ['sight', 'Sehenswert'], ['trip', 'Ausflug']];
 let diceCat = 'all';
 const dicePool = c => PLACES.filter(p => isPlace(p) && (c === 'all' || (c === 'food' && p.cat === 'food') || (c === 'bar' && p.cat === 'bar') ||
-  (c === 'vegan' && p.diet === 'vegan') || (c === 'kcd' && p.cat === 'kcd') || (c === 'trip' && isTrip(p))));
+  (c === 'vegan' && p.diet === 'vegan') || (c === 'kcd' && p.cat === 'kcd') || (c === 'sight' && p.cat === 'sight') || (c === 'trip' && isTrip(p))));
 function rollDice() {
   const pool = dicePool(diceCat), p = pool[Math.floor(Math.random() * pool.length)];
   $('#sheet-body').innerHTML = `<h2>Das Schicksal wählt…</h2>
@@ -728,7 +729,7 @@ function renderQuest() {
   $('#quest').className = 'quest'; $('#quest').innerHTML = head + body.html; if (body.after) body.after();
 }
 function questOrte() {
-  const sets = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Veggie-Essen']], n = S.visited.length;
+  const sets = [['kcd', 'KCD-Schauplätze'], ['sight', 'Sehenswürdigkeiten'], ['bar', 'Bars & Brauereien'], ['food', 'Veggie-Essen']], n = S.visited.length;
   return { html: `<div class="rb-row">${RANKS.map(([min, name], i) => `<div class="rb-slot ${n >= min ? 'got' : ''}">${rabbit(...RANK_RB[i], 'rb-mini')}<span>${name}</span><small>ab ${min}</small></div>`).join('')}</div>` +
     sets.map(([c, l]) => {
       const ps = PLACES.filter(p => p.cat === c), k = ps.filter(p => S.visited.includes(p.id)).length;

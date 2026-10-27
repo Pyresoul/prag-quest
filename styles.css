@@ -235,3 +235,6 @@ input[type=search]{width:100%}
 .rbc.got .rb-mini{filter:drop-shadow(1px 0 0 #18110a) drop-shadow(-1px 0 0 #18110a)}
 .rbc:not(.got){color:var(--mut)}
 .beer-title{font:600 22px var(--display);letter-spacing:2px;color:var(--hl);text-transform:uppercase}
+
+:root{--sight:#7fa3b8}
+.card.sight h3 .ic{color:var(--sight)}

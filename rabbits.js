@@ -1,11 +1,11 @@
 // Schwert-Hasen im Stil mittelalterlicher Randzeichnungen / Emaille-Pins (eigene SVG-Zeichnungen).
 // Eigene Bilder: Datei rabbits/<farbe>-<pose>.png (oder .webp) ablegen und den Namen unter window.RABBIT_IMAGES eintragen, siehe rabbits/README.md.
 window.RABBIT_IMAGES = window.RABBIT_IMAGES || [];
-window.RABBIT_COLORS = ['mustard', 'orange', 'grey', 'red', 'brown'];
+window.RABBIT_COLORS = ['mustard', 'orange', 'grey', 'red', 'brown', 'blue', 'green'];
 window.RABBIT_POSES = ['stand', 'guard', 'trumpet', 'lens', 'point', 'stop', 'burst', 'walk', 'attack', 'peek'];
 window.rabbit = (() => {
   const INK = '#18110a';
-  const COL = { mustard: ['#d9c45a', '#4d3f10', '#efe39a'], grey: ['#e7e5df', '#8a8780', '#ffffff'], orange: ['#e4883a', '#5e2a0c', '#f2b274'], red: ['#c4302a', '#430d09', '#e0786f'], brown: ['#9a6b3c', '#34200d', '#cfa874'] };
+  const COL = { mustard: ['#d9c45a', '#4d3f10', '#efe39a'], grey: ['#e7e5df', '#8a8780', '#ffffff'], orange: ['#e4883a', '#5e2a0c', '#f2b274'], red: ['#c4302a', '#430d09', '#e0786f'], brown: ['#9a6b3c', '#34200d', '#cfa874'], blue: ['#5b88ad', '#1b3248', '#a6c7e0'], green: ['#7ea35a', '#26401a', '#bad69e'] };
   const st = (w = 3) => `stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
   const limb = (d, c, w = 5) => `<path d="${d}" fill="none" ${st(w + 4)}/><path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
   const paw = (x, y, c, r = 3.8) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" ${st(2.4)}/>`;

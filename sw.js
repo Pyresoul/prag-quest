@@ -1,4 +1,4 @@
-const CACHE = 'prag-quest-v13', TILES = 'prag-quest-tiles';
+const CACHE = 'prag-quest-v14', TILES = 'prag-quest-tiles';
 const SHELL = ['./', 'index.html', 'styles.css', 'data.js', 'czech.js', 'rabbits.js', 'app.js', 'manifest.webmanifest', 'icon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
