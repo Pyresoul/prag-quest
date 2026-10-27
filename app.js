@@ -59,6 +59,7 @@ function show(view) {
   if (view === 'quest') renderQuest();
   if (view === 'cash') renderCash();
   if (view === 'lang') renderLang();
+  if (view === 'farkle' && window.PQ_farkle) window.PQ_farkle.render();
   if (view === 'list') renderList();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.dataset.view));
@@ -840,7 +841,7 @@ const sync = (() => {
   const newer = d => d.rev > S.rev || (d.rev === S.rev && d.by > S.by);
   const isNew = (e, cur) => !cur || e.ts > cur.ts || (e.ts === cur.ts && e.by > cur.by);
   const setStatus = s => { status = s; const b = $('#btn-group'); if (b) { b.dataset.s = s; b.title = s; } };
-  const renderEntries = () => { renderList(); renderPlan(); renderCash(); renderQuest(); };
+  const renderEntries = () => { renderList(); renderPlan(); renderCash(); renderQuest(); if (window.PQ_farkle) window.PQ_farkle.remote(); };
 
   function apply(d) {
     if (!d || typeof d.rev !== 'number' || !Array.isArray(d.plan) || !Array.isArray(d.fav) || !newer(d)) return;
@@ -970,6 +971,9 @@ function openGroup() {
   $('#sheet').hidden = false;
 }
 $('#btn-group').onclick = openGroup;
+
+window.PQ = { $, esc, toast, members, nameOf, sync, S: () => S };
+window.PQ_farkle = window.initFarkle ? window.initFarkle(window.PQ) : null;
 
 // ---------- Init ----------
 if (!S.entries['m:' + S.by]) { const N = ['Heinrich', 'Hans', 'Theresa', 'Radzig', 'Johanka', 'Hanush', 'Divish', 'Kunhuta', 'Bernard', 'Sasha']; S.entries['m:' + S.by] = { v: { n: N[Math.floor(Math.random() * N.length)] }, ts: 1, by: S.by }; store(); }
