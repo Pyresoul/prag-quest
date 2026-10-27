@@ -76,7 +76,7 @@ function renderChips() {
 const HAS_MAP = typeof L !== 'undefined';
 const map = HAS_MAP ? L.map('map', { zoomControl: false }).setView(PRAGUE, 12) : { invalidateSize() {} };
 if (!HAS_MAP) $('#map').innerHTML = '<div class="empty" style="margin:16px">Karte nicht geladen – bitte einmal online öffnen. „Entdecken“ und „Plan“ funktionieren trotzdem.</div>';
-else L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+else L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
 const layer = HAS_MAP ? L.layerGroup().addTo(map) : { clearLayers() {} };
 let me = null;
 function drawMarkers() {
@@ -107,8 +107,8 @@ const IMG_KEY = 'prag-quest.img.v1';
 let IMGS = {}; try { IMGS = JSON.parse(localStorage.getItem(IMG_KEY)) || {}; } catch (_) {}
 const saveImgs = () => { try { localStorage.setItem(IMG_KEY, JSON.stringify(IMGS)); } catch (_) {} };
 const POSE_FOR = p => p.trip ? 'attack' : p.cat === 'kcd' ? (p.epoch ? 'walk' : 'guard') : p.cat === 'bar' ? 'trumpet' : 'peek';
-const COLORS = ['mustard', 'orange', 'grey', 'red'];
-const RB_FOR = p => [COLORS[[...p.id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % COLORS.length], POSE_FOR(p)];
+const rabbitOf = p => { const i = Math.max(0, PLACES.indexOf(p)); return [window.RABBIT_COLORS[i % 5], window.RABBIT_POSES[Math.floor(i / 5) % 10]]; };
+const RB_FOR = rabbitOf;
 const imgTag = m => `<img loading="lazy" alt="" src="${esc(m.src)}" data-alt="${esc(m.alt || '')}"><a class="credit" href="${esc(m.page)}" target="_blank" rel="noopener">Foto: Wikipedia</a>`;
 function picHTML(p) {
   const m = IMGS[p.id], ok = m && m.src;
@@ -179,6 +179,7 @@ function card(p) {
     ${p.kcd ? `<div class="kcdnote ${p.epoch ? 'epoch' : ''}">${esc(p.kcd)}</div>` : ''}
     <p>${esc(p.desc)}</p>
     ${p.how ? `<div class="how"><b>Anreise</b> ${esc(p.how)}</div>` : ''}
+    ${hoursHTML(p)}
     <div class="actions">
       <button class="btn small ${f ? 'on' : ''}" data-a="fav">${f ? '★ Favorit' : '☆ Favorit'}</button>
       <button class="btn small ${planned(p.id) ? 'on' : ''}" data-a="plan">${planned(p.id) ? '✓ Im Plan' : '+ Plan'}</button>
@@ -189,6 +190,8 @@ function card(p) {
       <button class="btn small ${mv.d.includes(p.id) ? 'on' : ''}" data-a="down">▼ Dagegen ${tl.down.length || ''}</button>
       <button class="btn small" data-a="note">${noteOf(p.id) ? 'Notiz ändern' : 'Notiz'}</button>
       <button class="btn small" data-a="photo">Foto</button>
+      ${isPlace(p) ? '<button class="btn small" data-a="hours">Zeiten</button>' : ''}
+      ${p.cat === 'bar' ? '<button class="btn small" data-a="beer">Bier loggen</button>' : ''}
     </div>
     ${who ? `<div class="who">${esc(who)}</div>` : ''}
     ${noteHTML(p.id)}
@@ -197,7 +200,7 @@ function card(p) {
 }
 const ACT = {
   fav: id => toggleFav(id), plan: id => pickDay(id), visit: id => checkIn(id),
-  up: id => vote(id, 'u'), down: id => vote(id, 'd'), note: id => openNote(id), photo: id => takePhoto(id)
+  up: id => vote(id, 'u'), down: id => vote(id, 'd'), note: id => openNote(id), photo: id => takePhoto(id), hours: id => openHours(id), beer: id => openBeer(id)
 };
 let selId = null;
 const GROUPS = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Essen & Veggie']];
@@ -278,14 +281,146 @@ function pickDay(id) {
 function checkIn(id) {
   const p = BY_ID[id];
   if (S.visited.includes(id)) { S.visited = S.visited.filter(x => x !== id); return refresh(); }
-  const done = msg => { S.visited.push(id); closeSheet(); refresh(); toast(msg); };
-  const manual = () => { if (confirm('Nicht in der Nähe erkannt. Trotzdem als besucht markieren?')) done('Als besucht markiert'); };
+  const done = () => { S.visited.push(id); refresh(); showUnlock(p); };
+  const manual = () => { if (confirm('Nicht in der Nähe erkannt. Trotzdem als besucht markieren?')) done(); };
   if (!navigator.geolocation) return manual();
   navigator.geolocation.getCurrentPosition(pos => {
     const d = km({ lat: pos.coords.latitude, lng: pos.coords.longitude }, p);
-    d < 0.3 ? done('Eingecheckt! Mach ein Foto.') : manual();
+    d < 0.3 ? done() : manual();
   }, manual, { enableHighAccuracy: true, timeout: 8000 });
 }
+function showUnlock(p) {
+  const n = S.visited.length, rk = RANKS.find(([min]) => min === n);
+  $('#sheet-body').innerHTML = `<h2>Neuer Hase freigeschaltet</h2><div class="dice roll">${rabbit(...rabbitOf(p), 'rb-dice')}</div>
+    <p style="text-align:center">${esc(p.name)}<br><small style="color:var(--mut)">${n} von ${PLACES.length} Hasen gesammelt${rk ? ` · neuer Rang: ${rk[1]}` : ''}</small></p>
+    <div class="row"><button class="btn gold" id="u-photo">Foto machen</button><button class="btn" id="sheet-close">Weiter</button></div>`;
+  $('#sheet-body').onclick = e => { if (e.target.id === 'sheet-close') closeSheet(); if (e.target.id === 'u-photo') { closeSheet(); takePhoto(p.id); } };
+  $('#sheet').hidden = false;
+}
+
+// ---------- Öffnungszeiten (von der Gruppe eingetragen) ----------
+const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'], WD = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+const hoursOf = id => (S.entries['h:' + id] || {}).v || null;
+const hoursText = h => [h.o && h.e ? `${h.o}–${h.e}` : '', (h.c || []).length ? 'geschlossen: ' + h.c.map(d => DAYS[d]).join(', ') : '', h.n || ''].filter(Boolean).join(' · ');
+function openState(h, now = new Date()) {
+  const d = now.getDay();
+  if ((h.c || []).includes(d)) return { open: false, msg: `${WD[d]} geschlossen` };
+  if (h.o && h.e) {
+    const t = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    if (t < h.o) return { open: false, msg: `öffnet ${h.o}` };
+    if (t >= h.e) return { open: false, msg: `schloss ${h.e}` };
+    return { open: true, msg: `bis ${h.e}` };
+  }
+  return null;
+}
+function hoursHTML(p) {
+  const h = hoursOf(p.id);
+  if (!h) return p.hint ? `<div class="hours hintline">${esc(p.hint)}</div>` : '';
+  const st = openState(h);
+  return `<div class="hours"><b>Zeiten</b> ${esc(hoursText(h))}${st ? ` <span class="st ${st.open ? 'on' : 'off'}">${st.open ? 'Jetzt geöffnet' : 'Jetzt zu'} · ${esc(st.msg)}</span>` : ''}</div>`;
+}
+function openHours(id) {
+  const h = hoursOf(id) || { c: [], o: '', e: '', n: '' }, closed = new Set(h.c || []);
+  $('#sheet-body').innerHTML = `<h2>Öffnungszeiten · ${esc(BY_ID[id].name)}</h2>
+    <p>Trag ein, was bei Google Maps oder auf der Website steht. Alle in der Gruppe sehen es und werden im Plan gewarnt.</p>
+    <div class="chips-wrap" id="h-days"><span>Ruhetage:</span>${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip ${closed.has(d) ? 'on' : ''}" data-d="${d}">${DAYS[d]}</button>`).join('')}</div>
+    <div class="row"><label>Öffnet<input id="h-o" type="time" value="${esc(h.o || '')}"></label><label>Schließt<input id="h-e" type="time" value="${esc(h.e || '')}"></label></div>
+    <label class="gl">Hinweis<input id="h-n" maxlength="60" value="${esc(h.n || '')}" placeholder="z. B. Küche bis 21 Uhr"></label>
+    <div class="row"><button class="btn gold" id="h-save">Speichern</button><button class="btn" id="h-del">Löschen</button><button class="btn" id="sheet-close">Abbrechen</button></div>`;
+  $('#sheet-body').onclick = e => {
+    const d = e.target.dataset.d; if (d !== undefined) { const n = +d; closed.has(n) ? closed.delete(n) : closed.add(n); return e.target.classList.toggle('on'); }
+    const i = e.target.id;
+    if (i === 'sheet-close') return closeSheet();
+    if (i === 'h-save' || i === 'h-del') {
+      const v = { c: [...closed], o: $('#h-o').value, e: $('#h-e').value, n: $('#h-n').value.trim() };
+      sync.setEntry('h:' + id, i === 'h-del' || (!v.c.length && !v.o && !v.e && !v.n) ? null : v); closeSheet(); refresh();
+    }
+  };
+  $('#sheet').hidden = false;
+}
+const dayDate = i => { if (!S.start) return null; const d = new Date(S.start + 'T12:00'); d.setDate(d.getDate() + i); return d; };
+function planWarn(id, i) {
+  const d = dayDate(i); if (!d) return '';
+  const p = BY_ID[id], h = hoursOf(id), w = d.getDay(), out = [];
+  if (h) {
+    if ((h.c || []).includes(w)) out.push(`${WD[w]} geschlossen`);
+    else { const t = timeOf(id); if (t && h.o && t < h.o) out.push(`Öffnet erst um ${h.o}`); if (t && h.e && t >= h.e) out.push(`Schließt um ${h.e}`); }
+  } else if (p.hint && w === 1) out.push('Montag: oft geschlossen, bitte prüfen');
+  return out.map(x => `<div class="warn">${esc(x)}</div>`).join('');
+}
+
+// ---------- Bier-Tagebuch ----------
+const BEERS = ['Pilsner Urquell', 'Gambrinus', 'Kozel hell', 'Kozel dunkel', 'Budweiser Budvar', 'Staropramen', 'Bernard', 'Krušovice', 'Starobrno', 'Radegast', 'Svijany', 'Matuška', 'Únětické pivo', 'Klosterbier (Strahov)', 'Hausbrauerei-Bier', 'Fruchtbier', 'Weizenbier', 'Alkoholfrei'];
+const BEER_RANKS = [[0, 'Wasserträger'], [1, 'Durstiger Knecht'], [3, 'Bierprüfer'], [6, 'Zapfmeister'], [10, 'Humpenmeister'], [15, 'Bierkönig von Böhmen']];
+const beerRank = n => BEER_RANKS.reduce((r, [min, name]) => n >= min ? name : r, BEER_RANKS[0][1]);
+const allBeers = () => Object.entries(S.entries).filter(([k, e]) => k[0] === 'b' && e.v).map(([k, e]) => ({ k, ...e.v })).sort((a, b) => b.t - a.t);
+const uniqBeers = (list, m) => new Set(list.filter(b => b.m === m).map(b => b.w.toLowerCase())).size;
+function openBeer(placeId) {
+  let rate = 0;
+  $('#sheet-body').innerHTML = `<h2>Bier loggen${placeId ? ' · ' + esc(BY_ID[placeId].name) : ''}</h2>
+    <label class="gl">Welches Bier?<input id="bw" list="beer-list" maxlength="40" placeholder="z. B. Pilsner Urquell"></label>
+    <datalist id="beer-list">${BEERS.map(b => `<option value="${esc(b)}">`).join('')}</datalist>
+    <div class="chips-wrap" id="b-rate"><span>Bewertung:</span>${[1, 2, 3, 4, 5].map(n => `<button class="chip" data-r="${n}">${'★'.repeat(n)}</button>`).join('')}</div>
+    <div class="row"><button class="btn gold" id="b-save">Eintragen</button><button class="btn" id="sheet-close">Abbrechen</button></div>`;
+  $('#sheet-body').onclick = e => {
+    const r = e.target.dataset.r; if (r) { rate = +r; return document.querySelectorAll('#b-rate .chip').forEach(c => c.classList.toggle('on', +c.dataset.r === rate)); }
+    if (e.target.id === 'sheet-close') return closeSheet();
+    if (e.target.id === 'b-save') {
+      const w = $('#bw').value.trim(); if (!w) return toast('Biername eintragen');
+      const before = beerRank(uniqBeers(allBeers(), S.by));
+      sync.setEntry('b:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), { m: S.by, w, r: rate, p: placeId || '', t: Date.now() });
+      const n = uniqBeers(allBeers(), S.by), after = beerRank(n);
+      closeSheet(); refresh(); toast(after !== before ? `Neuer Titel: ${after}` : `Prost! ${n} verschiedene Biere`);
+    }
+  };
+  $('#sheet').hidden = false;
+}
+
+// ---------- Offline-Karte ----------
+const lon2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
+const lat2y = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
+function tileList() {
+  const set = new Set(), add = (b, zs) => zs.forEach(z => { for (let x = lon2x(b[1], z); x <= lon2x(b[3], z); x++) for (let y = lat2y(b[2], z); y <= lat2y(b[0], z); y++) set.add(`${z}/${x}/${y}`); });
+  add([50.058, 14.385, 50.100, 14.455], [12, 13, 14, 15, 16]); // Prager Zentrum bis Straßenebene
+  add([49.99, 14.30, 50.14, 14.60], [11, 12]);                  // Prag gesamt, grob
+  PLACES.filter(isTrip).forEach(p => add([p.lat - .02, p.lng - .03, p.lat + .02, p.lng + .03], [12, 13, 14])); // Ausflugsziele: Übersicht
+  return [...set];
+}
+async function saveOfflineMap(progress) {
+  const cache = await caches.open('prag-quest-tiles'), queue = tileList(), total = queue.length; let done = 0, fail = 0;
+  const worker = async () => {
+    while (queue.length) {
+      const url = `https://tile.openstreetmap.org/${queue.shift()}.png`;
+      try { if (!(await cache.match(url))) { const r = await fetch(url, { mode: 'cors' }); r.ok ? await cache.put(url, r) : fail++; } } catch (_) { fail++; }
+      progress(++done, total, fail); await new Promise(r => setTimeout(r, 90));
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (fail < total / 2) { S.offline = Date.now(); store(); }
+  return fail;
+}
+function openOffline() {
+  const n = tileList().length, when = S.offline ? new Date(S.offline).toLocaleDateString('de-DE') : '';
+  $('#sheet-body').innerHTML = `<h2>Offline-Karte</h2>
+    <p>Speichert Prag (bis auf Straßenebene) und die Umgebung der Ausflugsziele (Übersicht) auf dem Handy, damit die Karte auch ohne Netz im Zug oder Ausland geht. Etwa ${n} Kacheln, ca. ${Math.round(n * 18 / 1000)} MB. Am besten im WLAN.</p>
+    ${when ? `<p class="hint">Zuletzt gespeichert am ${when}.</p>` : ''}
+    <div class="bar-out"><div class="bar-in" id="off-bar" style="width:0"></div></div><p class="hint" id="off-msg"></p>
+    <div class="row"><button class="btn gold" id="off-go">${when ? 'Aktualisieren' : 'Jetzt speichern'}</button><button class="btn" id="off-del">Löschen</button><button class="btn" id="sheet-close">Schließen</button></div>
+    <p class="hint">Kartendaten von OpenStreetMap. Es werden bewusst nur wenige Kacheln geladen, bitte nicht wiederholt starten.</p>`;
+  $('#sheet-body').onclick = async e => {
+    if (e.target.id === 'sheet-close') return closeSheet();
+    if (!window.caches) return toast('Offline-Speicher nicht verfügbar');
+    if (e.target.id === 'off-del') { await caches.delete('prag-quest-tiles'); S.offline = 0; store(); return openOffline(); }
+    if (e.target.id === 'off-go') {
+      e.target.disabled = true;
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+      const fail = await saveOfflineMap((d, t, f) => { $('#off-bar').style.width = (d / t * 100) + '%'; $('#off-msg').textContent = `${d} / ${t} Kacheln${f ? ` (${f} fehlgeschlagen)` : ''}`; });
+      toast(fail ? 'Teilweise gespeichert' : 'Offline-Karte gespeichert'); openOffline();
+    }
+  };
+  $('#sheet').hidden = false;
+}
+$('#btn-offline').onclick = openOffline;
 
 // ---------- Fotos (nur auf diesem Gerät, IndexedDB) ----------
 const idbDo = (mode, fn) => new Promise((res, rej) => {
@@ -373,6 +508,7 @@ function renderPlan() {
       return leg + `<article class="card ${p.cat}" data-id="${id}" data-day="${i}"><h3>${CAT[p.cat].icon}<span>${esc(p.name)}</span></h3>
         <div class="meta"><span>${esc(p.area)}</span>${p.trip ? `<span class="tag trip">Ausflug ${esc(p.trip)}</span>` : ''}</div>
         <label class="timerow">Uhrzeit <input type="time" data-t="${id}" value="${esc(timeOf(id))}"></label>
+        ${planWarn(id, i)}
         ${p.how ? `<div class="how"><b>Anreise</b> ${esc(p.how)} <a href="${transitUrl('Praha hlavní nádraží', p.lat + ',' + p.lng)}" target="_blank" rel="noopener">ÖPNV-Route</a></div>` : ''}
         ${noteHTML(id)}
         <div class="actions"><button class="btn small" data-m="-1">↑</button><button class="btn small" data-m="1">↓</button><button class="btn small" data-a="note">Notiz</button><button class="btn small" data-m="x">✕ Entfernen</button></div></article>`;
@@ -511,27 +647,53 @@ const RANK_RB = [['mustard', 'stand'], ['grey', 'peek'], ['orange', 'point'], ['
 const rankIdx = n => RANKS.reduce((r, [min], i) => n >= min ? i : r, 0);
 function rankOf(n) { let r = RANKS[0][1]; RANKS.forEach(([min, name]) => { if (n >= min) r = name; }); return r; }
 const renderRank = () => { $('#rank').innerHTML = `Rang<b>${rankOf(S.visited.length)}</b>${S.visited.length}/${PLACES.length} Orte`; };
+let questTab = 'orte';
 function renderQuest() {
-  const sets = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Veggie-Essen']];
-  const pct = Math.round(S.visited.length / PLACES.length * 100);
-  $('#quest').className = 'quest'; $('#quest').innerHTML = `<div class="quest-head">${rabbit(...RANK_RB[rankIdx(S.visited.length)], 'rb-rank')}<div><h2 class="quest-title">${rankOf(S.visited.length)}</h2><div class="quest-sub">${S.visited.length} von ${PLACES.length} Orten besucht</div></div></div>
+  const n = S.visited.length, pct = Math.round(n / PLACES.length * 100);
+  const head = `<div class="quest-head">${rabbit(...RANK_RB[rankIdx(n)], 'rb-rank')}<div><h2 class="quest-title">${rankOf(n)}</h2><div class="quest-sub">${n} von ${PLACES.length} Orten besucht</div></div></div>
     <div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
-    <div class="rb-row">${RANKS.map(([min, name], i) => `<div class="rb-slot ${S.visited.length >= min ? 'got' : ''}">${rabbit(...RANK_RB[i], 'rb-mini')}<span>${name}</span><small>ab ${min}</small></div>`).join('')}</div>
-    <h3><span>Foto-Album</span><span id="album-n"></span></h3><div class="album" id="album"></div>` +
-    sets.map(([c, l]) => {
-      const ps = PLACES.filter(p => p.cat === c), n = ps.filter(p => S.visited.includes(p.id)).length;
-      return `<h3><span>${l}</span><span>${n}/${ps.length}</span></h3>` +
-        ps.map(p => `<div class="badge ${S.visited.includes(p.id) ? 'done' : ''}">${CAT[c].icon}<span>${esc(p.name)}</span></div>`).join('');
-    }).join('') +
-    `<p style="color:var(--mut);font-size:14px;margin-top:16px;font-style:italic">Checke dich vor Ort per GPS (≤300 m) ein und mach ein Foto, um Abzeichen und Ränge freizuschalten.</p>`;
-  photoAll().then(all => {
-    const el = $('#album'); if (!el) return;
-    all.sort((a, b) => b.ts - a.ts);
-    $('#album-n').textContent = all.length;
-    el.innerHTML = all.length ? all.map(v => `<button class="alb" data-ph="${v.id}"><img src="${v.img}" alt=""><span>${esc((BY_ID[v.id] || {}).name || '')}</span></button>`).join('') : '<div class="empty">Noch keine Fotos. Tippe bei einem Ort auf „Foto“.</div>';
-  });
+    <div class="chips">${[['orte', 'Orte'], ['hasen', 'Hasen'], ['bier', 'Bier'], ['fotos', 'Fotos']].map(([k, l]) => `<button class="chip ${questTab === k ? 'on' : ''}" data-qt="${k}">${l}</button>`).join('')}</div>`;
+  const body = { orte: questOrte, hasen: questHasen, bier: questBier, fotos: questFotos }[questTab]();
+  $('#quest').className = 'quest'; $('#quest').innerHTML = head + body.html; if (body.after) body.after();
 }
-$('#quest').onclick = e => { const b = e.target.closest('[data-ph]'); if (b) viewPhoto(b.dataset.ph); };
+function questOrte() {
+  const sets = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Veggie-Essen']], n = S.visited.length;
+  return { html: `<div class="rb-row">${RANKS.map(([min, name], i) => `<div class="rb-slot ${n >= min ? 'got' : ''}">${rabbit(...RANK_RB[i], 'rb-mini')}<span>${name}</span><small>ab ${min}</small></div>`).join('')}</div>` +
+    sets.map(([c, l]) => {
+      const ps = PLACES.filter(p => p.cat === c), k = ps.filter(p => S.visited.includes(p.id)).length;
+      return `<h3><span>${l}</span><span>${k}/${ps.length}</span></h3>` + ps.map(p => `<div class="badge ${S.visited.includes(p.id) ? 'done' : ''}">${CAT[c].icon}<span>${esc(p.name)}</span></div>`).join('');
+    }).join('') + `<p class="hint" style="margin-top:16px">Checke dich vor Ort per GPS (≤300 m) ein, um Hasen, Abzeichen und Ränge freizuschalten.</p>` };
+}
+function questHasen() {
+  const got = PLACES.filter(p => S.visited.includes(p.id)).length;
+  return { html: `<h3><span>Hasen-Sammlung</span><span>${got}/${PLACES.length}</span></h3><p class="hint">Jeder Ort hat seinen eigenen Hasen. Er wird beim Einchecken freigeschaltet.</p>
+    <div class="rbgrid">${PLACES.map(p => { const g = S.visited.includes(p.id); return `<button class="rbc ${g ? 'got' : ''}" data-rb="${p.id}">${rabbit(...rabbitOf(p), 'rb-mini')}<span>${g ? esc(p.name) : '???'}</span></button>`; }).join('')}</div>` };
+}
+function questBier() {
+  const list = allBeers(), mine = list.filter(b => b.m === S.by), n = uniqBeers(list, S.by);
+  const board = members().map(m => { const bs = list.filter(b => b.m === m), rs = bs.filter(b => b.r); return { m, u: uniqBeers(list, m), t: bs.length, avg: rs.length ? rs.reduce((s, b) => s + b.r, 0) / rs.length : 0 }; }).sort((a, b) => b.u - a.u || b.t - a.t);
+  return { html: `<h3><span>Dein Titel</span><span>${n} verschiedene</span></h3><div class="beer-title">${beerRank(n)}</div>
+    <button class="btn gold" data-bnew="1" style="width:100%;margin:8px 0 4px">Bier eintragen</button>
+    <h3><span>Rangliste</span></h3>${board.map((r, i) => `<div class="bal"><span>${i + 1}. ${esc(nameOf(r.m))}${r.m === S.by ? ' (ich)' : ''}<br><small style="color:var(--mut)">${beerRank(r.u)}</small></span><span>${r.u} Sorten · ${r.t} Gläser${r.avg ? ' · ' + r.avg.toFixed(1) + ' ★' : ''}</span></div>`).join('')}
+    <h3><span>Mein Tagebuch</span><span>${mine.length}</span></h3>` +
+    (mine.length ? mine.map(b => `<div class="exp"><div><b>${esc(b.w)}</b><br><small>${b.p && BY_ID[b.p] ? esc(BY_ID[b.p].name) + ' · ' : ''}${new Date(b.t).toLocaleDateString('de-DE')}${b.r ? ' · ' + '★'.repeat(b.r) : ''}</small></div><span></span><button class="btn small" data-bdel="${esc(b.k)}" aria-label="Löschen">✕</button></div>`).join('') : '<div class="empty">Noch kein Bier eingetragen.</div>') };
+}
+function questFotos() {
+  return { html: `<h3><span>Foto-Album</span><span id="album-n"></span></h3><div class="album" id="album"></div>`, after() {
+    photoAll().then(all => {
+      const el = $('#album'); if (!el) return;
+      all.sort((a, b) => b.ts - a.ts); $('#album-n').textContent = all.length;
+      el.innerHTML = all.length ? all.map(v => `<button class="alb" data-ph="${v.id}"><img src="${v.img}" alt=""><span>${esc((BY_ID[v.id] || {}).name || '')}</span></button>`).join('') : '<div class="empty">Noch keine Fotos. Tippe bei einem Ort auf „Foto“.</div>';
+    });
+  } };
+}
+$('#quest').onclick = e => {
+  const t = e.target.closest('[data-qt]'); if (t) { questTab = t.dataset.qt; return renderQuest(); }
+  const b = e.target.closest('[data-ph]'); if (b) return viewPhoto(b.dataset.ph);
+  const r = e.target.closest('[data-rb]'); if (r && S.visited.includes(r.dataset.rb)) { const p = BY_ID[r.dataset.rb]; $('#sheet-body').innerHTML = `<h2>${esc(p.name)}</h2><div class="dice">${rabbit(...rabbitOf(p), 'rb-dice')}</div><button class="btn" id="sheet-close" style="width:100%">Schließen</button>`; $('#sheet-body').onclick = ev => { if (ev.target.id === 'sheet-close') closeSheet(); }; return $('#sheet').hidden = false; }
+  if (e.target.closest('[data-bnew]')) return openBeer();
+  const d = e.target.closest('[data-bdel]'); if (d && confirm('Eintrag löschen?')) { sync.setEntry(d.dataset.bdel, null); renderQuest(); }
+};
 
 // ---------- Kasse: Umrechner & Ausgaben ----------
 let RATE = { r: 24.5, est: true };
