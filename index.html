@@ -32,6 +32,7 @@
     <div class="shields" id="chips-list"></div>
     <div class="row">
       <button class="btn gold" id="btn-dice">Schicksalswürfel</button>
+      <button class="btn" id="btn-near">In der Nähe</button>
     </div>
     <div id="list"></div>
   </section>
@@ -52,6 +53,10 @@
       <button class="btn" id="btn-share">Teilen</button>
     </div>
     <div id="plan"></div>
+  </section>
+
+  <section id="view-beers" class="view">
+    <div id="beers"></div>
   </section>
 
   <section id="view-farkle" class="view">
@@ -90,6 +95,7 @@
   <button data-view="cash"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.6-1.5-3-1.5-1.8 0-3 1-3 2.3s1.2 2 3 2.4 3 1.1 3 2.4-1.2 2.4-3 2.4c-1.4 0-2.5-.6-3-1.6M12 6.5v1.5M12 16v1.5"/></svg></span>Kasse</button>
   <button data-view="lang"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9h8M8 12h5"/></svg></span>Sprache</button>
   <button data-view="farkle"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/></svg></span>Farkle</button>
+  <button data-view="beers"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>Biere</button>
   <button data-view="quest"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg></span>Quest</button>
 </nav>
 
@@ -102,6 +108,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="data.js"></script>
 <script src="czech.js"></script>
+<script src="beers.js"></script>
 <script src="rabbits.js"></script>
 <script src="farkle.js"></script>
 <script src="app.js"></script>

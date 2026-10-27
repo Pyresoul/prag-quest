@@ -13,7 +13,7 @@ window.PLACES = [
     desc: 'Ruhiger als die Prager Burg, mit Festungswällen und dem besten Sonnenuntergang über der Moldau.' },
   { id: 'k-breunov', wiki: "de:Kloster Břevnov", cat: 'kcd', epoch: true, name: 'Kloster Břevnov', area: 'Břevnov', lat: 50.0849, lng: 14.3563,
     kcd: 'Nicht im Spiel, passt aber zur Klosterwelt von Sasau: ältestes Männerkloster Böhmens (993).',
-    desc: 'Barocke Anlage mit mittelalterlicher Krypta und eigener Klosterbrauerei (St. Norbert).' },
+    desc: 'Barocke Anlage mit mittelalterlicher Krypta und eigener Klosterbrauerei (St. Adalbert, Benedict-Biere).' },
   { id: 'k-emmaus', wiki: "de:Emauskloster", cat: 'kcd', epoch: true, name: 'Emauskloster', area: 'Neustadt', lat: 50.0699, lng: 14.4158,
     kcd: 'Nicht im Spiel: Von Karl IV. gegründetes Kloster mit gotischem Kreuzgang.',
     desc: 'Eines der schönsten gotischen Klöster Prags, kaum Touristen.' },
@@ -170,5 +170,7 @@ window.PLACES = [
   { id: 's-zizkov', cat: 'sight', wiki: "de:Žižkov-Fernsehturm", name: "Žižkov-Fernsehturm", area: "Žižkov", lat: 50.0813, lng: 14.4503,
     desc: "Markanter Fernsehturm mit krabbelnden Baby-Skulpturen von David Černý, Aussicht und Bar in der Höhe." },
   { id: 's-wallenstein', cat: 'sight', name: "Wallenstein-Garten", area: "Kleinseite", lat: 50.0911, lng: 14.4078,
-    desc: "Barocker Garten des Wallenstein-Palastes, kostenlos zugänglich, mit Pfauen, Teich und Tropfsteinwand. Ruhig mitten in der Kleinseite." }
+    desc: "Barocker Garten des Wallenstein-Palastes, kostenlos zugänglich, mit Pfauen, Teich und Tropfsteinwand. Ruhig mitten in der Kleinseite." },
+  { id: 'b-medvidku', cat: 'bar', name: 'U Medvídků', area: 'Altstadt', lat: 50.0818, lng: 14.4192,
+    desc: 'Na Perštýně 7. Traditionsgasthaus mit Budvar vom Fass und eigener Mikrobrauerei mit unfiltrierten Hausbieren, darunter das sehr starke X-BEER 33°. Auch Brauereiführungen. Das Haus hat Wurzeln bis ins späte Mittelalter.' }
 ];

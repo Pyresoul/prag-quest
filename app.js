@@ -22,7 +22,7 @@ const KEY = 'prag-quest.v1';
 const PRAGUE = [50.0875, 14.4213];
 
 // ---------- State ----------
-const def = () => ({ days: 4, start: '', plan: [[], [], [], []], fav: [], visited: [], filter: 'all', room: '', rev: 0, by: '', entries: {} });
+const def = () => ({ days: 4, start: '', plan: [[], [], [], []], fav: [], visited: [], filter: 'all', room: '', rev: 0, by: '', entries: {}, vt: {}, ticks: [] });
 let S = def();
 try { S = Object.assign(def(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (_) {}
 const store = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} };
@@ -59,6 +59,8 @@ function show(view) {
   if (view === 'quest') renderQuest();
   if (view === 'cash') renderCash();
   if (view === 'lang') renderLang();
+  if (view === 'beers') renderBeers();
+  const at = document.querySelector('.tabs button.active'); if (at && at.scrollIntoView) at.scrollIntoView({ inline: 'center', block: 'nearest' });
   if (view === 'farkle' && window.PQ_farkle) window.PQ_farkle.render();
   if (view === 'list') renderList();
 }
@@ -283,7 +285,7 @@ function pickDay(id) {
 function checkIn(id) {
   const p = BY_ID[id];
   if (S.visited.includes(id)) { S.visited = S.visited.filter(x => x !== id); return refresh(); }
-  const done = () => { S.visited.push(id); refresh(); showUnlock(p); };
+  const done = () => { S.visited.push(id); S.vt = S.vt || {}; S.vt[id] = Date.now(); refresh(); showUnlock(p); };
   const manual = () => { if (confirm('Nicht in der Nähe erkannt. Trotzdem als besucht markieren?')) done(); };
   if (!navigator.geolocation) return manual();
   navigator.geolocation.getCurrentPosition(pos => {
@@ -409,16 +411,77 @@ async function findOsmHours(p) {
   return best || null;
 }
 
+
+// ---------- In der Nähe ----------
+let nearCat = 'all', nearPos = null;
+const distStr = d => d < 1 ? `${Math.round(d * 100) * 10} m` : `${d.toFixed(1).replace('.', ',')} km`;
+function renderNearby() {
+  $('#toast').hidden = true;
+  const here = nearPos || { lat: PRAGUE[0], lng: PRAGUE[1] };
+  const cands = PLACES.filter(p => isPlace(p) && (nearCat === 'all' || p.cat === nearCat)).map(p => ({ p, d: km(here, p), h: hoursOf(p.id) }))
+    .sort((a, b) => a.d - b.d).slice(0, 10).map(x => ({ ...x, st: x.h ? openState(x.h) : null }));
+  const rank = x => x.st && x.st.open === true ? 0 : x.st && x.st.open === false ? 2 : 1; // offen zuerst, unbekannt, dann geschlossen
+  cands.sort((a, b) => rank(a) - rank(b) || a.d - b.d);
+  $('#sheet-body').innerHTML = `<h2>In der Nähe</h2>
+    ${nearPos ? '' : '<p class="hint">Dein Standort ist nicht verfügbar. Gezeigt wird die Umgebung der Altstadt.</p>'}
+    <div class="chips dice-chips">${[['all', 'Alles'], ['food', 'Essen'], ['bar', 'Bar'], ['sight', 'Sehenswert'], ['kcd', 'KCD']].map(([k, l]) => `<button class="chip ${nearCat === k ? 'on' : ''}" data-c="${k}">${l}</button>`).join('')}</div>
+    ${cands.map(x => `<button class="nrow" data-p="${x.p.id}"><span class="qsh" style="--c:${CAT[x.p.cat].color}">${CAT[x.p.cat].icon}</span><span class="nt">${esc(x.p.name)}<small>${distStr(x.d)}${x.d < 3 ? ` · ~${Math.max(1, Math.round(x.d * 1.3 / 4.5 * 60))} min zu Fuß` : ' · mit ÖPNV'}</small></span>${x.st && x.st.open != null ? `<span class="st ${x.st.open ? 'on' : 'off'}">${x.st.open ? 'offen' : 'zu'}</span>` : ''}</button>`).join('') || '<div class="empty">Nichts gefunden.</div>'}
+    <div class="row" style="margin-top:10px"><button class="btn" id="near-refresh">Standort aktualisieren</button><button class="btn" id="sheet-close">Schließen</button></div>`;
+  $('#sheet-body').onclick = e => {
+    const c = e.target.dataset.c; if (c) { nearCat = c; return renderNearby(); }
+    const p = e.target.closest('[data-p]'); if (p) return openPlace(p.dataset.p);
+    if (e.target.id === 'near-refresh') return openNearby();
+    if (e.target.id === 'sheet-close') closeSheet();
+  };
+  $('#sheet').hidden = false;
+}
+function openNearby() {
+  if (!navigator.geolocation) { nearPos = null; return renderNearby(); }
+  toast('Standort wird bestimmt…');
+  navigator.geolocation.getCurrentPosition(pos => { nearPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }; renderNearby(); },
+    () => { nearPos = null; renderNearby(); }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+}
+$('#btn-near').onclick = openNearby;
+
+// ---------- Bier-Guide ----------
+let beerCat = 'all';
+function renderBeers() {
+  const G = window.BEER_GUIDE, ticks = S.ticks || [], n = G.filter(b => ticks.includes(b.id)).length;
+  const items = G.filter(b => beerCat === 'all' || b.cat === beerCat);
+  $('#beers').innerHTML = `<h2 class="sec">Must-Drink-Biere</h2>
+    <p class="hint">Diese Sorten solltest du in Prag probiert haben und hier gibt es sie. Angaben aus Recherche, Sortiment und Öffnungszeiten vor Ort prüfen.</p>
+    <div class="quest-head"><div><div class="beer-title">${n} / ${G.length}</div><div class="quest-sub">probiert</div></div></div>
+    <div class="bar-out"><div class="bar-in" style="width:${Math.round(n / G.length * 100)}%"></div></div>
+    <div class="chips">${window.BEER_CATS.map(([k, l]) => `<button class="chip ${beerCat === k ? 'on' : ''}" data-bc="${k}">${l}</button>`).join('')}</div>` +
+    items.map(b => `<article class="card bar beer" data-b="${b.id}">
+      <h3>${CAT.bar.icon}<span>${esc(b.name)}</span></h3>
+      <div class="meta"><span>${esc(b.from)}</span><span class="tag">${esc(b.style)}</span>${ticks.includes(b.id) ? '<span class="tag game">probiert</span>' : ''}</div>
+      <p>${esc(b.why)}</p>
+      <div class="where-h">Wo in Prag</div>
+      ${b.where.map(w => w.pid && BY_ID[w.pid]
+        ? `<button class="where" data-wp="${w.pid}">${esc(BY_ID[w.pid].name)}${w.note ? `<small>${esc(w.note)}</small>` : ''}</button>`
+        : `<a class="where" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(w.q)}">${esc(w.t)}${w.note ? `<small>${esc(w.note)}</small>` : ''}</a>`).join('')}
+      <div class="actions" style="margin-top:8px"><button class="btn small ${ticks.includes(b.id) ? 'on' : ''}" data-btick="${b.id}">${ticks.includes(b.id) ? '✓ Probiert' : 'Als probiert markieren'}</button><button class="btn small" data-blog="${b.id}">Ins Tagebuch</button></div></article>`).join('') +
+    `<h2 class="sec">Wo es besonders viele Biere gibt</h2>` +
+    window.BEER_VENUES.map(v => `<a class="where venue" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.q)}"><b>${esc(v.t)}</b> · ${esc(v.area)}<small>${esc(v.d)}</small></a>`).join('');
+}
+$('#beers').onclick = e => {
+  const c = e.target.closest('[data-bc]'); if (c) { beerCat = c.dataset.bc; return renderBeers(); }
+  const w = e.target.closest('[data-wp]'); if (w) return openPlace(w.dataset.wp);
+  const t = e.target.closest('[data-btick]'); if (t) { const id = t.dataset.btick; S.ticks = (S.ticks || []).includes(id) ? S.ticks.filter(x => x !== id) : [...(S.ticks || []), id]; store(); return renderBeers(); }
+  const l = e.target.closest('[data-blog]'); if (l) { const b = window.BEER_GUIDE.find(x => x.id === l.dataset.blog); const first = b.where.find(x => x.pid && BY_ID[x.pid] && BY_ID[x.pid].cat === 'bar'); return openBeer(first ? first.pid : '', b.name); }
+};
+
 // ---------- Bier-Tagebuch ----------
 const BEERS = ['Pilsner Urquell', 'Gambrinus', 'Kozel hell', 'Kozel dunkel', 'Budweiser Budvar', 'Staropramen', 'Bernard', 'Krušovice', 'Starobrno', 'Radegast', 'Svijany', 'Matuška', 'Únětické pivo', 'Klosterbier (Strahov)', 'Hausbrauerei-Bier', 'Fruchtbier', 'Weizenbier', 'Alkoholfrei'];
 const BEER_RANKS = [[0, 'Wasserträger'], [1, 'Durstiger Knecht'], [3, 'Bierprüfer'], [6, 'Zapfmeister'], [10, 'Humpenmeister'], [15, 'Bierkönig von Böhmen']];
 const beerRank = n => BEER_RANKS.reduce((r, [min, name]) => n >= min ? name : r, BEER_RANKS[0][1]);
 const allBeers = () => Object.entries(S.entries).filter(([k, e]) => k[0] === 'b' && e.v).map(([k, e]) => ({ k, ...e.v })).sort((a, b) => b.t - a.t);
 const uniqBeers = (list, m) => new Set(list.filter(b => b.m === m).map(b => b.w.toLowerCase())).size;
-function openBeer(placeId) {
+function openBeer(placeId, prefill) {
   let rate = 0;
   $('#sheet-body').innerHTML = `<h2>Bier loggen${placeId ? ' · ' + esc(BY_ID[placeId].name) : ''}</h2>
-    <label class="gl">Welches Bier?<input id="bw" list="beer-list" maxlength="40" placeholder="z. B. Pilsner Urquell"></label>
+    <label class="gl">Welches Bier?<input id="bw" list="beer-list" maxlength="40" placeholder="z. B. Pilsner Urquell" value="${esc(prefill || '')}"></label>
     <datalist id="beer-list">${BEERS.map(b => `<option value="${esc(b)}">`).join('')}</datalist>
     <div class="chips-wrap" id="b-rate"><span>Bewertung:</span>${[1, 2, 3, 4, 5].map(n => `<button class="chip" data-r="${n}">${'★'.repeat(n)}</button>`).join('')}</div>
     <div class="row"><button class="btn gold" id="b-save">Eintragen</button><button class="btn" id="sheet-close">Abbrechen</button></div>`;
@@ -725,8 +788,8 @@ function renderQuest() {
   const n = S.visited.length, pct = Math.round(n / PLACES.length * 100);
   const head = `<div class="quest-head">${rabbit(...RANK_RB[rankIdx(n)], 'rb-rank')}<div><h2 class="quest-title">${rankOf(n)}</h2><div class="quest-sub">${n} von ${PLACES.length} Orten besucht</div></div></div>
     <div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
-    <div class="chips">${[['orte', 'Orte'], ['hasen', 'Hasen'], ['bier', 'Bier'], ['fotos', 'Fotos']].map(([k, l]) => `<button class="chip ${questTab === k ? 'on' : ''}" data-qt="${k}">${l}</button>`).join('')}</div>`;
-  const body = { orte: questOrte, hasen: questHasen, bier: questBier, fotos: questFotos }[questTab]();
+    <div class="chips">${[['orte', 'Orte'], ['hasen', 'Hasen'], ['bier', 'Bier'], ['fotos', 'Fotos'], ['tagebuch', 'Tagebuch']].map(([k, l]) => `<button class="chip ${questTab === k ? 'on' : ''}" data-qt="${k}">${l}</button>`).join('')}</div>`;
+  const body = { orte: questOrte, hasen: questHasen, bier: questBier, fotos: questFotos, tagebuch: questTagebuch }[questTab]();
   $('#quest').className = 'quest'; $('#quest').innerHTML = head + body.html; if (body.after) body.after();
 }
 function questOrte() {
@@ -751,6 +814,42 @@ function questBier() {
     <h3><span>Mein Tagebuch</span><span>${mine.length}</span></h3>` +
     (mine.length ? mine.map(b => `<div class="exp"><div><b>${esc(b.w)}</b><br><small>${b.p && BY_ID[b.p] ? esc(BY_ID[b.p].name) + ' · ' : ''}${new Date(b.t).toLocaleDateString('de-DE')}${b.r ? ' · ' + '★'.repeat(b.r) : ''}</small></div><span></span><button class="btn small" data-bdel="${esc(b.k)}" aria-label="Löschen">✕</button></div>`).join('') : '<div class="empty">Noch kein Bier eingetragen.</div>') };
 }
+
+function diaryData() {
+  const xs = Object.entries(S.entries).filter(([k, e]) => k[0] === 'x' && e.v).map(([, e]) => e.v), total = xs.reduce((s, x) => s + x.a, 0);
+  const paid = {}; xs.forEach(x => { paid[x.p] = (paid[x.p] || 0) + x.a; });
+  const days = {}, undated = [];
+  S.visited.forEach(id => { const t = (S.vt || {})[id]; if (!t) return undated.push(id); const k = new Date(t).toISOString().slice(0, 10); (days[k] = days[k] || []).push(id); });
+  const mine = allBeers().filter(b => b.m === S.by), top = [...mine].sort((a, b) => (b.r || 0) - (a.r || 0) || b.t - a.t).slice(0, 5);
+  return { xs, total, paid, days, undated, mine, top, sorten: uniqBeers(allBeers(), S.by) };
+}
+const fmtDay = k => new Date(k + 'T12:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+function questTagebuch() {
+  const d = diaryData(), n = S.visited.length;
+  const stat = (b, l) => `<div class="stat"><b>${b}</b><small>${l}</small></div>`;
+  const planned = S.plan.filter(x => x.length).length;
+  const dayKeys = Object.keys(d.days).sort();
+  return { html: `<h3><span>Dein Reisetagebuch</span><span>${esc(nameOf(S.by))}</span></h3>
+    <div class="stat-grid">${stat(n + '/' + PLACES.length, 'Orte besucht')}${stat(n, 'Hasen')}${stat(d.sorten, 'Biersorten')}${stat(d.mine.length, 'Gläser')}${stat(planned, 'Plantage')}${stat(d.total ? nf(d.total) + ' Kč' : '–', 'Ausgaben Gruppe')}</div>
+    <h3><span>Besuchte Orte</span></h3>` +
+    (dayKeys.map(k => `<div class="dday"><b>${fmtDay(k)}</b>${d.days[k].map(id => `<div class="badge done">${CAT[BY_ID[id].cat].icon}<span>${esc(BY_ID[id].name)}</span></div>`).join('')}</div>`).join('') +
+     (d.undated.length ? `<div class="dday"><b>Ohne Datum</b>${d.undated.map(id => `<div class="badge done">${CAT[BY_ID[id].cat].icon}<span>${esc(BY_ID[id].name)}</span></div>`).join('')}</div>` : '') || '<div class="empty">Noch keine Orte besucht. Checke dich vor Ort ein.</div>') +
+    `<h3><span>Beste Biere</span></h3>` + (d.top.length ? d.top.map(b => `<div class="badge done"><span>${esc(b.w)}${b.r ? ' · ' + '★'.repeat(b.r) : ''}</span></div>`).join('') : '<div class="empty">Noch keine Biere eingetragen.</div>') +
+    `<h3><span>Ausgaben (Gruppe)</span></h3>` + (d.xs.length ? Object.entries(d.paid).map(([m, v]) => `<div class="bal"><span>${esc(nameOf(m))} hat bezahlt</span><span>${czk(v)}</span></div>`).join('') : '<div class="empty">Keine Ausgaben erfasst.</div>') +
+    `<h3><span>Fotos</span><span id="dfoto-n"></span></h3><div class="album" id="dalbum"></div>
+    <div class="row" style="margin-top:14px"><button class="btn gold" data-dshare="1">Tagebuch teilen (Text)</button></div>
+    <p class="hint">Fotos bleiben auf deinem Gerät und sind nicht im geteilten Text. Besuchsdaten sind erst ab dem Einchecken mit dieser Version vorhanden.</p>`,
+    after() { photoAll().then(all => { const el = $('#dalbum'); if (!el) return; all.sort((a, b) => b.ts - a.ts); $('#dfoto-n').textContent = all.length; el.innerHTML = all.length ? all.slice(0, 9).map(v => `<button class="alb" data-ph="${v.id}"><img src="${v.img}" alt=""><span>${esc((BY_ID[v.id] || {}).name || '')}</span></button>`).join('') : '<div class="empty">Noch keine Fotos.</div>'; }); } };
+}
+function diaryText() {
+  const d = diaryData(), n = S.visited.length, L = [`Prag Quest · Reisetagebuch von ${nameOf(S.by)}`, '', `${rankOf(n)} · ${n}/${PLACES.length} Orte · ${d.sorten} Biersorten (${d.mine.length} Gläser)`, ''];
+  Object.keys(d.days).sort().forEach(k => { L.push(fmtDay(k)); d.days[k].forEach(id => L.push(' • ' + BY_ID[id].name)); L.push(''); });
+  if (d.undated.length) { L.push('Weitere Orte:'); d.undated.forEach(id => L.push(' • ' + BY_ID[id].name)); L.push(''); }
+  if (d.top.length) { L.push('Beste Biere:'); d.top.forEach(b => L.push(` • ${b.w}${b.r ? ' ' + '★'.repeat(b.r) : ''}`)); L.push(''); }
+  if (d.xs.length) L.push(`Ausgaben Gruppe: ${czk(d.total)} (${eur(d.total)})`);
+  return L.join('\n').trim();
+}
+
 function questFotos() {
   return { html: `<h3><span>Foto-Album</span><span id="album-n"></span></h3><div class="album" id="album"></div>`, after() {
     photoAll().then(all => {
@@ -765,6 +864,7 @@ $('#quest').onclick = e => {
   const b = e.target.closest('[data-ph]'); if (b) return viewPhoto(b.dataset.ph);
   const r = e.target.closest('[data-rb]'); if (r && S.visited.includes(r.dataset.rb)) { const p = BY_ID[r.dataset.rb]; $('#sheet-body').innerHTML = `<h2>${esc(p.name)}</h2><div class="dice">${rabbit(...rabbitOf(p), 'rb-dice')}</div><button class="btn" id="sheet-close" style="width:100%">Schließen</button>`; $('#sheet-body').onclick = ev => { if (ev.target.id === 'sheet-close') closeSheet(); }; return $('#sheet').hidden = false; }
   if (e.target.closest('[data-bnew]')) return openBeer();
+  if (e.target.closest('[data-dshare]')) { const txt = diaryText(); return (navigator.share ? navigator.share({ title: 'Prag Quest Reisetagebuch', text: txt }) : navigator.clipboard.writeText(txt).then(() => toast('Tagebuch kopiert'))).catch(() => {}); }
   const d = e.target.closest('[data-bdel]'); if (d && confirm('Eintrag löschen?')) { sync.setEntry(d.dataset.bdel, null); renderQuest(); }
 };
 

@@ -273,3 +273,18 @@ input[type=search]{width:100%}
 .fk-rules{margin-top:14px;background:var(--panel);border:1px solid var(--line2);padding:8px 12px}
 .fk-rules summary{font:600 11px var(--display);letter-spacing:1px;text-transform:uppercase;color:var(--gold);cursor:pointer}
 .btn:disabled{opacity:.4}
+
+/* Tabs scrollbar bei vielen Reitern, Nähe, Bier-Guide, Tagebuch */
+.tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;min-width:50px;padding-left:4px;padding-right:4px}
+.nrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;margin-bottom:6px;background:var(--panel);border:1px solid var(--line);color:var(--txt);font:inherit;font-size:18px}
+.nrow .nt{flex:1;min-width:0}.nrow small{display:block;font-size:13px;color:var(--mut)}
+.where{display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;background:#2a2116;border:1px solid var(--line2);color:var(--txt);font:inherit;font-size:17px;text-decoration:none}
+.where small{display:block;font-size:13px;color:var(--mut)}
+.where-h{font:700 9px var(--display);letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin:6px 0 4px}
+.venue b{font:600 15px var(--display);letter-spacing:.5px;color:var(--hl)}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 6px}
+.stat{text-align:center;border:1px solid var(--line);background:var(--panel);padding:8px 2px}
+.stat b{display:block;font:600 20px var(--display);color:var(--hl)}
+.stat small{font:600 9px var(--display);letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+.dday{margin-bottom:8px}.dday>b{display:block;font:600 12px var(--display);letter-spacing:1px;color:var(--gold);text-transform:uppercase;margin:8px 0 2px}
