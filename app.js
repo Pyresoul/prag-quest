@@ -90,7 +90,7 @@ $('#btn-locate').onclick = () => {
 const IMG_KEY = 'prag-quest.img.v1';
 let IMGS = {}; try { IMGS = JSON.parse(localStorage.getItem(IMG_KEY)) || {}; } catch (_) {}
 const saveImgs = () => { try { localStorage.setItem(IMG_KEY, JSON.stringify(IMGS)); } catch (_) {} };
-const POSE_FOR = p => p.trip ? 'point' : p.cat === 'kcd' ? (p.epoch ? 'stand' : 'guard') : p.cat === 'bar' ? 'trumpet' : 'lens';
+const POSE_FOR = p => p.trip ? 'attack' : p.cat === 'kcd' ? (p.epoch ? 'walk' : 'guard') : p.cat === 'bar' ? 'trumpet' : 'peek';
 const COLORS = ['mustard', 'orange', 'grey', 'red'];
 const RB_FOR = p => [COLORS[[...p.id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % COLORS.length], POSE_FOR(p)];
 const imgTag = m => `<img loading="lazy" alt="" src="${esc(m.src)}" data-alt="${esc(m.alt || '')}"><a class="credit" href="${esc(m.page)}" target="_blank" rel="noopener">Foto: Wikipedia</a>`;
@@ -290,7 +290,7 @@ $('#btn-phrases').onclick = () => {
 };
 
 // ---------- Quest ----------
-const RANK_RB = [['mustard', 'stand'], ['grey', 'lens'], ['orange', 'point'], ['orange', 'stop'], ['red', 'guard'], ['mustard', 'burst']];
+const RANK_RB = [['mustard', 'stand'], ['grey', 'peek'], ['orange', 'point'], ['orange', 'stop'], ['red', 'attack'], ['mustard', 'burst']];
 const rankIdx = n => RANKS.reduce((r, [min], i) => n >= min ? i : r, 0);
 function rankOf(n) { let r = RANKS[0][1]; RANKS.forEach(([min, name]) => { if (n >= min) r = name; }); return r; }
 const renderRank = () => { $('#rank').innerHTML = `Rang<b>${rankOf(S.visited.length)}</b>${S.visited.length}/${PLACES.length} Orte`; };

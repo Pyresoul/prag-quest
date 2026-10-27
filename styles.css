@@ -151,3 +151,5 @@ table{width:100%;border-collapse:collapse}td{padding:9px 4px;border-bottom:1px s
   .hr{gap:8px}.grp{padding:4px 8px 4px 18px;font-size:10px}.grp::before{left:6px}
   .rank{font-size:10px}.rank b{font-size:11px}
 }
+.rb{filter:drop-shadow(1.4px 0 0 #18110a) drop-shadow(-1.4px 0 0 #18110a) drop-shadow(0 1.4px 0 #18110a) drop-shadow(0 -1.4px 0 #18110a)}
+.rb-slot .rb-mini{filter:grayscale(1) brightness(.45)}.rb-slot.got .rb-mini{filter:drop-shadow(1px 0 0 #18110a) drop-shadow(-1px 0 0 #18110a)}
