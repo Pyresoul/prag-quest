@@ -10,10 +10,11 @@ const KEY = 'prag-quest.v1';
 const PRAGUE = [50.0875, 14.4213];
 
 // ---------- State ----------
-const def = () => ({ days: 4, start: '', plan: [[], [], [], []], fav: [], visited: [], filter: 'all' });
+const def = () => ({ days: 4, start: '', plan: [[], [], [], []], fav: [], visited: [], filter: 'all', room: '', rev: 0, by: '' });
 let S = def();
 try { S = Object.assign(def(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (_) {}
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} };
+const store = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} };
+const save = () => { store(); sync.onLocalChange(); };
 function fitPlan() { while (S.plan.length < S.days) S.plan.push([]); S.plan.length = S.days; }
 fitPlan();
 
@@ -260,7 +261,105 @@ function renderQuest() {
     `<p style="color:var(--mut);font-size:14px;margin-top:16px;font-style:italic">Checke dich vor Ort per GPS (≤300 m) ein, um Abzeichen und Ränge freizuschalten.</p>`;
 }
 
+
+// ---------- Gruppen-Sync ----------
+// Favoriten, Plan, Tage und Startdatum werden pro Gruppe über ntfy.sh geteilt (Raum-Code = geheimer Topic-Name).
+// Check-ins bleiben persönlich. Konflikte: der zuletzt gespeicherte Stand gewinnt.
+const sync = (() => {
+  const BASE = window.NTFY_BASE || 'https://ntfy.sh';
+  if (!S.by) S.by = Math.random().toString(36).slice(2, 10);
+  const snap = () => JSON.stringify({ days: S.days, start: S.start, plan: S.plan, fav: S.fav });
+  let last = snap(), es = null, timer = null, status = 'off';
+  const topic = () => 'pq-' + S.room;
+  const newer = d => d.rev > S.rev || (d.rev === S.rev && d.by > S.by);
+  const setStatus = s => { status = s; const b = $('#btn-group'); if (b) { b.dataset.s = s; b.title = s; } };
+
+  function apply(d) {
+    if (!d || typeof d.rev !== 'number' || !Array.isArray(d.plan) || !Array.isArray(d.fav) || !newer(d)) return;
+    Object.assign(S, { days: d.days, start: d.start || '', plan: d.plan, fav: d.fav, rev: d.rev, by: S.by });
+    S.rev = d.rev; fitPlan(); last = snap(); store();
+    renderList(); drawMarkers(); renderRank(); renderPlan(); renderQuest();
+  }
+  async function push() {
+    if (!S.room) return;
+    const body = JSON.stringify({ rev: S.rev, by: S.by, days: S.days, start: S.start, plan: S.plan, fav: S.fav });
+    try { await fetch(`${BASE}/${topic()}`, { method: 'POST', body }); setStatus('on'); } catch (_) { setStatus('offline'); }
+  }
+  async function pull() {
+    if (!S.room) return;
+    try {
+      const txt = await (await fetch(`${BASE}/${topic()}/json?poll=1&since=all`)).text();
+      let best = null;
+      txt.split('\n').filter(Boolean).forEach(l => { try { const m = JSON.parse(l); if (m.event === 'message') { const d = JSON.parse(m.message); if (!best || d.rev > best.rev) best = d; } } catch (_) {} });
+      setStatus('on');
+      if (best && newer(best)) apply(best);
+      else if (!best || S.rev > best.rev) { if (!S.rev) S.rev = Date.now(); store(); push(); } // Raum leer oder abgelaufen: lokalen Stand wieder einstellen
+    } catch (_) { setStatus('offline'); }
+  }
+  function listen() {
+    if (es) es.close();
+    if (!S.room || !window.EventSource) return;
+    es = new EventSource(`${BASE}/${topic()}/sse`);
+    es.onopen = () => setStatus('on');
+    es.onerror = () => setStatus('offline');
+    es.onmessage = e => { try { apply(JSON.parse(JSON.parse(e.data).message)); } catch (_) {} };
+  }
+  function start() { if (!S.room) return setStatus('off'); setStatus('connecting'); pull().then(listen); }
+  const api = {
+    get status() { return status; },
+    link: () => `${location.origin}${location.pathname}#room=${S.room}`,
+    onLocalChange() {
+      if (!S.room || snap() === last) return;
+      last = snap(); S.rev = Date.now(); store();
+      clearTimeout(timer); timer = setTimeout(push, 300);
+    },
+    create() {
+      const b = crypto.getRandomValues(new Uint8Array(12));
+      S.room = Array.from(b, x => x.toString(36).padStart(2, '0')).join('').slice(0, 20);
+      S.rev = Date.now(); store(); push(); listen(); setStatus('on');
+    },
+    join(code) {
+      const m = String(code).match(/room=([a-z0-9]{8,40})/i) || String(code).trim().match(/^([a-z0-9]{8,40})$/i);
+      if (!m) return false;
+      S.room = m[1].toLowerCase(); S.rev = 0; store(); start(); return true;
+    },
+    leave() { if (es) es.close(); S.room = ''; store(); setStatus('off'); },
+    start, pull
+  };
+  window.addEventListener('online', () => api.pull());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) api.pull(); });
+  return api;
+})();
+
+function openGroup() {
+  const inRoom = !!S.room;
+  const label = { on: 'Verbunden', connecting: 'Verbinde…', offline: 'Offline – Änderungen werden nachgereicht', off: '' }[sync.status] || '';
+  $('#sheet-body').innerHTML = inRoom
+    ? `<h2>Gruppe</h2><p>${esc(label)}. Favoriten und Plan sind für alle mit diesem Link gleich. Check-ins bleiben persönlich.</p>
+       <input id="g-link" readonly value="${esc(sync.link())}" style="width:100%;margin-bottom:10px">
+       <div class="row"><button class="btn gold" id="g-copy">Link kopieren</button><button class="btn" id="g-share">Teilen</button></div>
+       <div class="row"><button class="btn" id="g-leave">Gruppe verlassen</button><button class="btn" id="sheet-close">Schließen</button></div>`
+    : `<h2>Gruppe</h2><p>Plant gemeinsam: Alle mit dem Link sehen und bearbeiten denselben Plan und dieselben Favoriten. Jeder, der den Link kennt, kann mitmachen.</p>
+       <div class="row"><button class="btn gold" id="g-new">Neue Gruppe starten</button></div>
+       <p>Oder einer Gruppe beitreten:</p>
+       <input id="g-code" placeholder="Link oder Code einfügen" style="width:100%;margin-bottom:10px">
+       <div class="row"><button class="btn" id="g-join">Beitreten</button><button class="btn" id="sheet-close">Schließen</button></div>`;
+  $('#sheet-body').onclick = async e => {
+    const id = e.target.id;
+    if (id === 'sheet-close') return closeSheet();
+    if (id === 'g-new') { sync.create(); openGroup(); toast('Gruppe gestartet – Link teilen'); }
+    if (id === 'g-join') { if (sync.join($('#g-code').value)) { closeSheet(); toast('Gruppe beigetreten'); } else toast('Link oder Code ungültig'); }
+    if (id === 'g-leave') { sync.leave(); openGroup(); }
+    if (id === 'g-copy') { try { await navigator.clipboard.writeText(sync.link()); toast('Link kopiert'); } catch (_) { $('#g-link').select(); toast('Link markiert – manuell kopieren'); } }
+    if (id === 'g-share') { try { await navigator.share({ title: 'Prag Quest Gruppe', url: sync.link() }); } catch (_) { try { await navigator.clipboard.writeText(sync.link()); toast('Link kopiert'); } catch (_) {} } }
+  };
+  $('#sheet').hidden = false;
+}
+$('#btn-group').onclick = openGroup;
+
 // ---------- Init ----------
-renderChips(); renderRank(); drawMarkers(); renderList();
+const hashRoom = (location.hash.match(/room=([a-z0-9]{8,40})/i) || [])[1];
+if (hashRoom && hashRoom.toLowerCase() !== S.room) { sync.join(hashRoom); toast('Gruppe beigetreten'); } else sync.start();
+renderChips(); renderRank(); drawMarkers(); renderList(); renderPlan();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

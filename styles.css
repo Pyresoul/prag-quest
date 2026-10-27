@@ -111,3 +111,10 @@ table{width:100%;border-collapse:collapse}td{padding:9px 4px;border-bottom:1px s
 .pin{width:28px;height:32px;border-radius:3px 3px 15px 15px;background:var(--c);border:2px solid var(--parch);box-shadow:0 2px 4px #000a,inset 0 0 0 1px #0006;display:flex;align-items:center;justify-content:center;color:var(--parch)}
 .pin .ic svg{width:16px;height:16px;stroke-width:2}
 .leaflet-popup-content-wrapper{background:var(--parch);color:var(--ink)}.leaflet-popup-tip{background:var(--parch)}
+
+.hr{display:flex;align-items:center;gap:12px}
+.grp{font:700 11px var(--display);letter-spacing:1px;text-transform:uppercase;background:var(--ink);color:var(--gold);border:1px solid var(--gold);padding:5px 10px 5px 22px;position:relative;border-radius:2px}
+.grp::before{content:"";position:absolute;left:8px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:#6b5a3a}
+.grp[data-s=on]::before{background:#7fb35f}.grp[data-s=connecting]::before{background:#d6b13c}.grp[data-s=offline]::before{background:#c0452f}
+.sheet-body p{margin:0 0 12px;font-size:16px}
+.sheet-body input{background:var(--parch)}
