@@ -47,6 +47,7 @@ function show(view) {
   if (view === 'plan') renderPlan();
   if (view === 'quest') renderQuest();
   if (view === 'cash') renderCash();
+  if (view === 'lang') renderLang();
   if (view === 'list') renderList();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.dataset.view));
@@ -433,11 +434,43 @@ $('#btn-dice').onclick = () => {
   };
   roll(); $('#sheet').hidden = false;
 };
-$('#btn-phrases').onclick = () => {
-  $('#sheet-body').innerHTML = '<h2>Tschechisch für Veggies &amp; Bier</h2><table>' +
-    window.PHRASES.map(([de, cz]) => `<tr><td>${esc(de)}</td><td>${esc(cz)}</td></tr>`).join('') +
-    '</table><button class="btn" id="sheet-close" style="width:100%;margin-top:12px">Schließen</button>';
-  $('#sheet-body').onclick = e => { if (e.target.id === 'sheet-close') closeSheet(); };
+$('#btn-phrases').onclick = () => show('lang');
+
+// ---------- Sprache (Tschechisch) ----------
+const CZ = window.CZECH;
+let czSec = 'all', czQ = '';
+const FLAG = { V: ['vegetarisch', 'veg'], VG: ['vegan', 'vegan'], F: ['Fleisch', 'meat'], '?': ['nachfragen', 'ask'] };
+function renderLang() {
+  $('#cz-intro').innerHTML = `<details><summary>Aussprache in 30 Sekunden</summary><div class="cz-ab">${window.CZ_INTRO.map(([a, b]) => `<div><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join('')}</div></details>`;
+  $('#cz-chips').innerHTML = [['all', 'Alle'], ...CZ.map(s => [s.id, s.title])].map(([k, l]) => `<button class="chip ${czSec === k ? 'on' : ''}" data-s="${k}">${esc(l)}</button>`).join('');
+  const q = czQ.toLowerCase().trim();
+  const html = CZ.map((s, si) => {
+    if (czSec !== 'all' && s.id !== czSec) return '';
+    const items = s.items.map((it, ii) => [it, ii]).filter(([it]) => !q || it.slice(0, 3).join(' ').toLowerCase().includes(q));
+    if (!items.length) return '';
+    return `<h3 class="sec">${esc(s.title)}</h3>${s.note ? `<p class="hint">${esc(s.note)}</p>` : ''}` + items.map(([it, ii]) => `<div class="cz" data-k="${si}:${ii}">
+      <div class="cz-de">${esc(it[0])}${it[3] ? ` <span class="fl ${FLAG[it[3]][1]}">${FLAG[it[3]][0]}</span>` : ''}</div>
+      <div class="cz-cs">${esc(it[1])}</div><div class="cz-pr">${esc(it[2])}</div>
+      <div class="actions"><button class="btn small" data-z="show">Zeigen</button><button class="btn small" data-z="say">Hören</button></div></div>`).join('');
+  }).join('');
+  $('#cz-list').innerHTML = html || `<div class="empty">${rabbit('orange', 'stop', 'rb-empty')}<br>Nichts gefunden.</div>`;
+}
+$('#cz-chips').onclick = e => { const s = e.target.dataset.s; if (!s) return; czSec = s; renderLang(); };
+$('#cz-q').oninput = e => { czQ = e.target.value; renderLang(); };
+function sayCz(t) {
+  if (!window.speechSynthesis) return toast('Vorlesen nicht verfügbar');
+  const u = new SpeechSynthesisUtterance(t); u.lang = 'cs-CZ';
+  const v = speechSynthesis.getVoices().find(x => x.lang.replace('_', '-').toLowerCase().startsWith('cs'));
+  if (v) u.voice = v; else toast('Keine tschechische Stimme installiert, klingt evtl. deutsch');
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+$('#cz-list').onclick = e => {
+  const b = e.target.closest('[data-z]'); if (!b) return;
+  const [si, ii] = b.closest('[data-k]').dataset.k.split(':').map(Number), it = CZ[si].items[ii];
+  if (b.dataset.z === 'say') return sayCz(it[1]);
+  $('#sheet-body').innerHTML = `<div class="cz-big"><div class="cz-big-cs">${esc(it[1])}</div><div class="cz-big-de">${esc(it[0])}</div></div>
+    <div class="row"><button class="btn gold" id="cz-say">Hören</button><button class="btn" id="sheet-close">Schließen</button></div>`;
+  $('#sheet-body').onclick = ev => { if (ev.target.id === 'sheet-close') closeSheet(); if (ev.target.id === 'cz-say') sayCz(it[1]); };
   $('#sheet').hidden = false;
 };
 

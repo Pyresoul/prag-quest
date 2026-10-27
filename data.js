@@ -124,12 +124,3 @@ window.PLACES = [
   { id: 'f-krcma-pilze', cat: 'food', diet: 'veg', name: 'Houbová omáčka mit Knödel', area: 'überall', lat: 50.0888, lng: 14.4189,
     desc: 'Tipp: Pilzsoße mit Knödeln (houbová omáčka) ist ein tschechischer Klassiker und meist fleischfrei. Bei der Bestellung „bez slaniny“ (ohne Speck) dazusagen.' }
 ];
-
-window.PHRASES = [
-  ['Ich bin Veganer / Veganerin.', 'Jsem vegan / vegánka.'],
-  ['Ohne Fleisch, bitte.', 'Bez masa, prosím.'],
-  ['Ohne Milchprodukte und Ei.', 'Bez mléčných výrobků a vajec.'],
-  ['Ist das vegetarisch?', 'Je to bez masa?'],
-  ['Zwei Bier, bitte.', 'Dvě piva, prosím.'],
-  ['Zum Wohl!', 'Na zdraví!']
-];

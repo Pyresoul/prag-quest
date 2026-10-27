@@ -53,6 +53,13 @@
     <div id="plan"></div>
   </section>
 
+  <section id="view-lang" class="view">
+    <div class="cz-intro" id="cz-intro"></div>
+    <input id="cz-q" type="search" placeholder="Suchen: Deutsch oder Tschechisch" style="width:100%;margin-bottom:8px">
+    <div class="chips" id="cz-chips"></div>
+    <div id="cz-list"></div>
+  </section>
+
   <section id="view-cash" class="view">
     <h2 class="sec">Kronen-Umrechner</h2>
     <div class="row"><label>Euro<input id="cv-eur" type="text" inputmode="decimal"></label><label>Kronen (Kč)<input id="cv-czk" type="text" inputmode="decimal"></label></div>
@@ -76,6 +83,7 @@
   <button data-view="list"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>Entdecken</button>
   <button data-view="plan"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zM9 8h6M9 12h6M9 16h4"/></svg></span>Plan</button>
   <button data-view="cash"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.6-1.5-3-1.5-1.8 0-3 1-3 2.3s1.2 2 3 2.4 3 1.1 3 2.4-1.2 2.4-3 2.4c-1.4 0-2.5-.6-3-1.6M12 6.5v1.5M12 16v1.5"/></svg></span>Kasse</button>
+  <button data-view="lang"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8 9h8M8 12h5"/></svg></span>Sprache</button>
   <button data-view="quest"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg></span>Quest</button>
 </nav>
 
@@ -87,6 +95,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="data.js"></script>
+<script src="czech.js"></script>
 <script src="rabbits.js"></script>
 <script src="app.js"></script>
 </body>

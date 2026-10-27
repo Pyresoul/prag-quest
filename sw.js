@@ -1,5 +1,5 @@
-const CACHE = 'prag-quest-v6';
-const SHELL = ['./', 'index.html', 'styles.css', 'data.js', 'rabbits.js', 'app.js', 'manifest.webmanifest', 'icon.svg',
+const CACHE = 'prag-quest-v7';
+const SHELL = ['./', 'index.html', 'styles.css', 'data.js', 'czech.js', 'rabbits.js', 'app.js', 'manifest.webmanifest', 'icon.svg',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
 
