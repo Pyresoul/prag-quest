@@ -4,8 +4,18 @@
 const PLACES = window.PLACES;
 const rabbit = window.rabbit;
 const BY_ID = Object.fromEntries(PLACES.map(p => [p.id, p]));
-const CAT = { kcd: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/></svg></span>', label: 'KCD', color: '#a07a22' }, bar: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>', label: 'Bar', color: '#8f2d1f' }, food: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/></svg></span>', label: 'Essen', color: '#4c6b3a' } };
-const FILTERS = [['all', 'Alle'], ['kcd', 'KCD'], ['trip', 'Ausflüge'], ['city', 'Nur Prag'], ['bar', 'Bars'], ['veg', 'Veggie'], ['vegan', 'Vegan'], ['top', 'Beliebt']];
+const CAT = { kcd: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/></svg></span>', label: 'KCD', color: '#c4ae3a' }, bar: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>', label: 'Bar', color: '#c4503b' }, food: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/></svg></span>', label: 'Essen', color: '#7fa95c' } };
+const FILTERS = [['all', 'Alle'], ['kcd', 'KCD'], ['trip', 'Ausflug'], ['city', 'Prag'], ['bar', 'Bars'], ['veg', 'Veggie'], ['vegan', 'Vegan'], ['top', 'Beliebt']];
+const FICON = {
+  all: '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>',
+  kcd: '<path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/>',
+  trip: '<path d="M5 19L19 5M10 5h9v9"/>',
+  city: '<path d="M6 21V9l3-2 3 2 3-2 3 2v12zM10 21v-5h4v5"/>',
+  bar: '<path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2"/>',
+  veg: '<path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/>',
+  vegan: '<path d="M12 21V10M12 10C12 6 9 4 5 4c0 4 2 6 7 6zM12 13c0-3 2-5 6-5 0 4-2 5-6 5z"/>',
+  top: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'
+};
 const RANKS = [[0, 'Bauernjunge'], [4, 'Knecht'], [9, 'Knappe'], [15, 'Söldner'], [22, 'Ritter'], [30, 'Held von Böhmen']];
 const KEY = 'prag-quest.v1';
 const PRAGUE = [50.0875, 14.4213];
@@ -54,10 +64,10 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.
 
 // ---------- Filters ----------
 function renderChips() {
-  const html = FILTERS.map(([k, l]) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  const html = FILTERS.map(([k, l]) => `<button class="sh ${S.filter === k ? 'on' : ''}" data-f="${k}"><span class="sd"><span class="si"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true">${FICON[k]}</svg></span></span></span><em>${l}</em></button>`).join('');
   ['#chips-map', '#chips-list'].forEach(sel => {
     const el = $(sel); el.innerHTML = html;
-    el.onclick = e => { const f = e.target.dataset.f; if (!f) return; S.filter = f; save(); renderChips(); renderList(); drawMarkers(); };
+    el.onclick = e => { const f = e.target.closest('[data-f]'); if (!f) return; S.filter = f.dataset.f; save(); renderChips(); renderList(); drawMarkers(); };
   });
 }
 
@@ -72,13 +82,16 @@ let me = null;
 function drawMarkers() {
   if (!HAS_MAP) return;
   layer.clearLayers();
+  const lab = map.getZoom() >= 14;
   PLACES.filter(p => matches(p, S.filter)).forEach(p => {
     const c = CAT[p.cat], v = S.visited.includes(p.id);
-    const icon = L.divIcon({ className: '', iconSize: [28, 32], iconAnchor: [14, 32],
-      html: `<div class="pin" style="--c:${c.color};opacity:${v ? .6 : 1}">${v ? '<span class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>' : c.icon}</div>` });
-    L.marker([p.lat, p.lng], { icon }).addTo(layer).on('click', () => openPlace(p.id));
+    const icon = L.divIcon({ className: '', iconSize: [26, 30], iconAnchor: [13, 30],
+      html: `<div class="pin" style="opacity:${v ? .6 : 1}"><span class="in" style="--c:${c.color}">${v ? '<span class="ic"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>' : c.icon}</span></div>` });
+    L.marker([p.lat, p.lng], { icon }).addTo(layer).on('click', () => openPlace(p.id))
+      .bindTooltip(esc(p.name), { permanent: lab, direction: 'right', offset: [10, -14], className: 'map-label' });
   });
 }
+if (HAS_MAP) map.on('zoomend', drawMarkers);
 $('#btn-locate').onclick = () => {
   if (!HAS_MAP || !navigator.geolocation) return toast('Kein GPS verfügbar');
   navigator.geolocation.getCurrentPosition(pos => {
@@ -186,20 +199,34 @@ const ACT = {
   fav: id => toggleFav(id), plan: id => pickDay(id), visit: id => checkIn(id),
   up: id => vote(id, 'u'), down: id => vote(id, 'd'), note: id => openNote(id), photo: id => takePhoto(id)
 };
-function bindCards(root) {
-  root.onclick = e => {
-    const im = e.target.closest('.myphoto img'); if (im) return viewPhoto(im.closest('[data-photo]').dataset.photo);
-    const b = e.target.closest('[data-a]'); if (!b) return;
-    ACT[b.dataset.a](b.closest('[data-id]').dataset.id);
-  };
+let selId = null;
+const GROUPS = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Essen & Veggie']];
+function rowHTML(p) {
+  const sel = selId === p.id, sc = score(p.id);
+  const mark = [S.visited.includes(p.id) ? '✓' : '', S.fav.includes(p.id) ? '★' : '', sc > 0 ? '▲' + sc : ''].filter(Boolean).join(' ');
+  return `<div class="qrow ${sel ? 'sel' : ''}" data-row="${p.id}"><span class="qsh" style="--c:${CAT[p.cat].color}">${CAT[p.cat].icon}</span>
+    <span class="qt">${esc(p.name)}<small>${esc(p.area)}${p.trip ? ' · Ausflug ' + esc(p.trip) : ''}</small></span><span class="qm">${mark}</span></div>` +
+    (sel ? `<div class="qdetail">${card(p)}</div>` : '');
 }
 function renderList() {
   let items = PLACES.filter(p => matches(p, S.filter));
-  if (S.filter === 'top') items.sort((a, b) => score(b.id) - score(a.id));
+  const top = S.filter === 'top';
+  if (top) items.sort((a, b) => score(b.id) - score(a.id));
+  const groups = top ? [['top', 'Beliebteste Orte']] : GROUPS;
   const el = $('#list');
-  el.innerHTML = items.map(card).join('') || `<div class="empty">${rabbit('orange', 'stop', 'rb-empty')}<br>${S.filter === 'top' ? 'Noch keine Stimmen. Gebt Orten ein ▲.' : 'Keine Treffer.'}</div>`;
-  bindCards(el); hydrate(el);
+  el.innerHTML = groups.map(([c, l]) => {
+    const ps = top ? items : items.filter(p => p.cat === c); if (!ps.length) return '';
+    return `<div class="log"><div class="log-head">${CAT[c] ? CAT[c].icon : ''}<span>${l}</span><b>${ps.filter(p => S.visited.includes(p.id)).length}/${ps.length}</b></div>${ps.map(rowHTML).join('')}</div>`;
+  }).join('') || `<div class="empty">${rabbit('orange', 'stop', 'rb-empty')}<br>${top ? 'Noch keine Stimmen. Gebt Orten ein ▲.' : 'Keine Treffer.'}</div>`;
+  hydrate(el);
 }
+$('#list').onclick = e => {
+  const im = e.target.closest('.myphoto img'); if (im) return viewPhoto(im.closest('[data-photo]').dataset.photo);
+  const b = e.target.closest('[data-a]'); if (b) return ACT[b.dataset.a](b.closest('[data-id]').dataset.id);
+  const r = e.target.closest('[data-row]'); if (!r) return;
+  selId = selId === r.dataset.row ? null : r.dataset.row; renderList();
+  const s = $('#list .qrow.sel'); if (s) s.scrollIntoView({ block: 'start', behavior: 'smooth' });
+};
 function openPlace(id) {
   const p = BY_ID[id];
   $('#sheet-body').innerHTML = card(p) + '<button class="btn" id="sheet-close" style="width:100%">Schließen</button>';
