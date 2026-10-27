@@ -467,7 +467,6 @@ function rollDice() {
   };
 }
 $('#btn-dice').onclick = () => { rollDice(); $('#sheet').hidden = false; };
-$('#btn-phrases').onclick = () => show('lang');
 
 // ---------- Sprache (Tschechisch) ----------
 const CZ = window.CZECH;
