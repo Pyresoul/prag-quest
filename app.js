@@ -307,6 +307,7 @@ function openState(h, now = new Date()) {
   if ((h.c || []).includes(d)) return { open: false, msg: `${WD[d]} geschlossen` };
   if (h.o && h.e) {
     const t = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    if (h.e < h.o) return t >= h.o || t < h.e ? { open: true, msg: `bis ${h.e}` } : { open: false, msg: `öffnet ${h.o}` }; // über Mitternacht
     if (t < h.o) return { open: false, msg: `öffnet ${h.o}` };
     if (t >= h.e) return { open: false, msg: `schloss ${h.e}` };
     return { open: true, msg: `bis ${h.e}` };
@@ -317,7 +318,7 @@ function hoursHTML(p) {
   const h = hoursOf(p.id);
   if (!h) return p.hint ? `<div class="hours hintline">${esc(p.hint)}</div>` : '';
   const st = openState(h);
-  return `<div class="hours"><b>Zeiten</b> ${esc(hoursText(h))}${st ? ` <span class="st ${st.open ? 'on' : 'off'}">${st.open ? 'Jetzt geöffnet' : 'Jetzt zu'} · ${esc(st.msg)}</span>` : ''}</div>`;
+  return `<div class="hours"><b>Zeiten</b> ${esc(hoursText(h))}${h.s === 'osm' ? ' <small>(OSM)</small>' : ''}${st ? ` <span class="st ${st.open ? 'on' : 'off'}">${st.open ? 'Jetzt geöffnet' : 'Jetzt zu'} · ${esc(st.msg)}</span>` : ''}</div>`;
 }
 function openHours(id) {
   const h = hoursOf(id) || { c: [], o: '', e: '', n: '' }, closed = new Set(h.c || []);
@@ -325,14 +326,24 @@ function openHours(id) {
     <p>Trag ein, was bei Google Maps oder auf der Website steht. Alle in der Gruppe sehen es und werden im Plan gewarnt.</p>
     <div class="chips-wrap" id="h-days"><span>Ruhetage:</span>${[1, 2, 3, 4, 5, 6, 0].map(d => `<button class="chip ${closed.has(d) ? 'on' : ''}" data-d="${d}">${DAYS[d]}</button>`).join('')}</div>
     <div class="row"><label>Öffnet<input id="h-o" type="time" value="${esc(h.o || '')}"></label><label>Schließt<input id="h-e" type="time" value="${esc(h.e || '')}"></label></div>
-    <label class="gl">Hinweis<input id="h-n" maxlength="60" value="${esc(h.n || '')}" placeholder="z. B. Küche bis 21 Uhr"></label>
+    <label class="gl">Hinweis<input id="h-n" maxlength="120" value="${esc(h.n || '')}" placeholder="z. B. Küche bis 21 Uhr"></label>
+    <div class="row"><button class="btn" id="h-osm">Von OpenStreetMap laden</button></div><div id="h-found"></div>
     <div class="row"><button class="btn gold" id="h-save">Speichern</button><button class="btn" id="h-del">Löschen</button><button class="btn" id="sheet-close">Abbrechen</button></div>`;
   $('#sheet-body').onclick = e => {
     const d = e.target.dataset.d; if (d !== undefined) { const n = +d; closed.has(n) ? closed.delete(n) : closed.add(n); return e.target.classList.toggle('on'); }
     const i = e.target.id;
     if (i === 'sheet-close') return closeSheet();
+    if (i === 'h-osm') {
+      $('#h-found').innerHTML = '<p class="hint">Suche…</p>';
+      return findOsmHours(BY_ID[id]).then(f => {
+        if (!f) return $('#h-found').innerHTML = '<p class="hint">Bei OpenStreetMap ist für diesen Ort nichts eingetragen. Prüf Google Maps und trag es selbst ein.</p>';
+        const pr = parseOH(f.oh);
+        $('#h-found').innerHTML = `<div class="note"><b>Gefunden</b> ${esc(f.name)}: ${esc(f.oh)}<br><button class="btn small" id="h-take" style="margin-top:6px">Übernehmen</button></div>`;
+        $('#h-take').onclick = () => { closed.clear(); (pr.c || []).forEach(d => closed.add(d)); document.querySelectorAll('#h-days .chip').forEach(c => c.classList.toggle('on', closed.has(+c.dataset.d))); $('#h-o').value = pr.o || ''; $('#h-e').value = pr.e || ''; $('#h-n').value = pr.n || ''; $('#h-found').dataset.osm = '1'; toast('Übernommen – bitte Speichern'); };
+      }).catch(() => { $('#h-found').innerHTML = '<p class="hint">OpenStreetMap ist gerade nicht erreichbar. Später nochmal.</p>'; });
+    }
     if (i === 'h-save' || i === 'h-del') {
-      const v = { c: [...closed], o: $('#h-o').value, e: $('#h-e').value, n: $('#h-n').value.trim() };
+      const v = { c: [...closed], o: $('#h-o').value, e: $('#h-e').value, n: $('#h-n').value.trim() }; if ($('#h-found').dataset.osm) v.s = 'osm';
       sync.setEntry('h:' + id, i === 'h-del' || (!v.c.length && !v.o && !v.e && !v.n) ? null : v); closeSheet(); refresh();
     }
   };
@@ -344,9 +355,56 @@ function planWarn(id, i) {
   const p = BY_ID[id], h = hoursOf(id), w = d.getDay(), out = [];
   if (h) {
     if ((h.c || []).includes(w)) out.push(`${WD[w]} geschlossen`);
-    else { const t = timeOf(id); if (t && h.o && t < h.o) out.push(`Öffnet erst um ${h.o}`); if (t && h.e && t >= h.e) out.push(`Schließt um ${h.e}`); }
+    else { const t = timeOf(id), wrap = h.e && h.o && h.e < h.o; if (t && h.o && !wrap && t < h.o) out.push(`Öffnet erst um ${h.o}`); if (t && h.e && !wrap && t >= h.e) out.push(`Schließt um ${h.e}`); if (t && wrap && t >= h.e && t < h.o) out.push(`Öffnet erst um ${h.o}`); }
   } else if (p.hint && w === 1) out.push('Montag: oft geschlossen, bitte prüfen');
   return out.map(x => `<div class="warn">${esc(x)}</div>`).join('');
+}
+
+
+// ---------- Öffnungszeiten aus OpenStreetMap ----------
+const CYC = [1, 2, 3, 4, 5, 6, 0], DAYIDX = { Mo: 1, Tu: 2, We: 3, Th: 4, Fr: 5, Sa: 6, Su: 0 };
+function expandDays(s) {
+  const out = [];
+  for (const tok of s.split(',').map(x => x.trim()).filter(Boolean)) {
+    const m = tok.match(/^(Mo|Tu|We|Th|Fr|Sa|Su)(?:-(Mo|Tu|We|Th|Fr|Sa|Su))?$/); if (!m) return null;
+    const a = CYC.indexOf(DAYIDX[m[1]]); if (!m[2]) { out.push(CYC[a]); continue; }
+    for (let i = a; ; i = (i + 1) % 7) { out.push(CYC[i]); if (CYC[i] === DAYIDX[m[2]]) break; }
+  }
+  return out;
+}
+// Teilmenge der OSM-Syntax (Wochentage, Zeiten, off). Alles andere bleibt als Hinweistext.
+function parseOH(str) {
+  str = String(str || '').trim(); if (!str) return null;
+  if (str === '24/7') return { c: [], o: '00:00', e: '23:59', n: '24/7' };
+  const raw = { c: [], o: '', e: '', n: str.slice(0, 120) };
+  if (/sunrise|sunset|week|"|\[|easter/i.test(str)) return raw;
+  const open = {};
+  for (const rule of str.split(';').map(x => x.trim()).filter(Boolean)) {
+    if (/^(PH|SH)\b/.test(rule)) continue;
+    const m = rule.match(/^([A-Za-z,\- ]*?)\s*((?:\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}(?:\s*,\s*)?)+|off|closed)$/i); if (!m) return raw;
+    const days = m[1].trim() ? expandDays(m[1].trim().replace(/\s*-\s*/g, '-')) : CYC; if (!days) return raw;
+    const v = m[2].toLowerCase();
+    days.forEach(d => { open[d] = /off|closed/.test(v) ? [] : v.split(',').map(x => x.trim().split('-').map(t => t.trim().padStart(5, '0'))); });
+  }
+  const od = CYC.filter(d => open[d] && open[d].length); if (!od.length) return raw;
+  const key = d => JSON.stringify(open[d]), uni = od.every(d => key(d) === key(od[0])) && open[od[0]].length === 1;
+  return { c: CYC.filter(d => !(open[d] && open[d].length)), o: uni ? open[od[0]][0][0] : '', e: uni ? open[od[0]][0][1] : '', n: uni ? '' : str.slice(0, 120) };
+}
+const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+const GENERIC = new Set(['bar', 'pub', 'cafe', 'cafe', 'cafe', 'restaurant', 'restaurace', 'kloster', 'klaster', 'burg', 'schloss', 'hrad', 'zamek', 'hospoda', 'hostinec', 'pivnice', 'pivovar', 'brauerei', 'dum', 'der', 'die', 'das', 'und', 'the', 'bistro', 'klosterbrauerei', 'biergarten', 'sady', 'pivovarsky']);
+function nameScore(a, b) {
+  const x = norm(a).filter(w => !GENERIC.has(w)), y = norm(b).filter(w => !GENERIC.has(w));
+  if (!x.length || !y.length) return 0;
+  const shared = x.filter(w => y.includes(w) || y.some(v => v.length > 3 && w.length > 3 && (v.includes(w) || w.includes(v)))).length;
+  return shared / Math.min(x.length, y.length);
+}
+async function findOsmHours(p) {
+  const q = `[out:json][timeout:20];nwr["opening_hours"](around:300,${p.lat},${p.lng});out tags center 30;`;
+  const r = await fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(q));
+  if (!r.ok) throw new Error('osm ' + r.status);
+  const best = (await r.json()).elements.map(e => ({ name: (e.tags.name || ''), oh: e.tags.opening_hours, s: nameScore(p.name.replace(/\(.*\)/, ''), e.tags.name || '') }))
+    .filter(e => e.s >= 0.5).sort((a, b) => b.s - a.s)[0];
+  return best || null;
 }
 
 // ---------- Bier-Tagebuch ----------
@@ -575,6 +633,19 @@ function autoPlan(ids, emptyMsg) {
 }
 $('#btn-auto').onclick = () => autoPlan(S.fav, 'Erst ein paar Favoriten markieren');
 $('#btn-auto-vote').onclick = () => autoPlan(PLACES.filter(p => score(p.id) > 0).sort((a, b) => score(b.id) - score(a.id)).map(p => p.id), 'Noch keine Orte mit mehr ▲ als ▼');
+
+$('#btn-hours').onclick = async () => {
+  const ids = [...new Set(S.plan.flat())].filter(id => isPlace(BY_ID[id]) && !hoursOf(id));
+  if (!ids.length) return toast('Für alle Orte im Plan gibt es schon Zeiten');
+  let ok = 0, miss = 0; const btn = $('#btn-hours'); btn.disabled = true;
+  for (const [n, id] of ids.entries()) {
+    btn.textContent = `Lade ${n + 1}/${ids.length}…`;
+    try { const f = await findOsmHours(BY_ID[id]); const pr = f && parseOH(f.oh); if (pr) { sync.setEntry('h:' + id, { ...pr, s: 'osm' }); ok++; } else miss++; } catch (_) { miss++; }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  btn.disabled = false; btn.textContent = 'Öffnungszeiten laden';
+  refresh(); toast(`${ok} Zeiten geladen${miss ? `, ${miss} nicht gefunden` : ''}`);
+};
 $('#btn-share').onclick = async () => {
   const txt = S.plan.map((ids, i) => `${dayLabel(i)}:\n` + (ids.map(id => ` • ${timeOf(id) ? timeOf(id) + ' ' : ''}${BY_ID[id].name}`).join('\n') || ' –')).join('\n\n');
   try { navigator.share ? await navigator.share({ title: 'Prag-Plan', text: txt }) : (await navigator.clipboard.writeText(txt), toast('Plan kopiert')); } catch (_) {}
