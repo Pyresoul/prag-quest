@@ -2,6 +2,7 @@
 'use strict';
 
 const PLACES = window.PLACES;
+const rabbit = window.rabbit;
 const BY_ID = Object.fromEntries(PLACES.map(p => [p.id, p]));
 const CAT = { kcd: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4l-9.5 9.5M8 11l5 5M9.5 14.5L5 19"/></svg></span>', label: 'KCD', color: '#a07a22' }, bar: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h10v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10h2a2 2 0 0 1 0 5h-2M7 5c0-1 1-1 1-2M11 5c0-1 1-1 1-2"/></svg></span>', label: 'Bar', color: '#8f2d1f' }, food: { icon: '<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l8-8"/></svg></span>', label: 'Essen', color: '#4c6b3a' } };
 const FILTERS = [['all', 'Alle'], ['kcd', 'KCD'], ['trip', 'Ausflüge'], ['city', 'Nur Prag'], ['bar', 'Bars'], ['veg', 'Veggie'], ['vegan', 'Vegan']];
@@ -84,10 +85,53 @@ $('#btn-locate').onclick = () => {
   }, () => toast('Standort nicht verfügbar'), { enableHighAccuracy: true, timeout: 8000 });
 };
 
+
+// ---------- Bilder (Wikipedia) & Hasen ----------
+const IMG_KEY = 'prag-quest.img.v1';
+let IMGS = {}; try { IMGS = JSON.parse(localStorage.getItem(IMG_KEY)) || {}; } catch (_) {}
+const saveImgs = () => { try { localStorage.setItem(IMG_KEY, JSON.stringify(IMGS)); } catch (_) {} };
+const POSE_FOR = p => p.trip ? 'point' : p.cat === 'kcd' ? (p.epoch ? 'stand' : 'guard') : p.cat === 'bar' ? 'trumpet' : 'lens';
+const COLORS = ['mustard', 'orange', 'grey', 'red'];
+const RB_FOR = p => [COLORS[[...p.id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % COLORS.length], POSE_FOR(p)];
+const imgTag = m => `<img loading="lazy" alt="" src="${esc(m.src)}" data-alt="${esc(m.alt || '')}"><a class="credit" href="${esc(m.page)}" target="_blank" rel="noopener">Foto: Wikipedia</a>`;
+function picHTML(p) {
+  const m = IMGS[p.id], ok = m && m.src;
+  return `<div class="pic ${ok ? '' : 'ph'}" data-pic="${p.id}">${ok ? imgTag(m) : rabbit(...RB_FOR(p))}</div>`;
+}
+async function loadImg(p) {
+  const c = IMGS[p.id]; if (c && (c.src || c.no)) return c;
+  try {
+    const r = await fetch(`https://${p.wiki.slice(0, 2)}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(p.wiki.slice(3).replace(/ /g, '_'))}`);
+    if (r.status === 404) IMGS[p.id] = { no: 1 };
+    else if (!r.ok) return null;
+    else { const j = await r.json(), t = j.thumbnail && j.thumbnail.source; IMGS[p.id] = t ? { src: t.replace(/\/\d+px-/, '/500px-'), alt: t, page: j.content_urls.desktop.page } : { no: 1 }; }
+  } catch (_) { return null; }
+  saveImgs(); return IMGS[p.id];
+}
+function hydrate(root) {
+  root.querySelectorAll('[data-pic]').forEach(el => {
+    const p = BY_ID[el.dataset.pic]; if (!p || !p.wiki || (IMGS[p.id] && IMGS[p.id].src)) return;
+    loadImg(p).then(m => { if (m && m.src && el.isConnected) { el.classList.remove('ph'); el.innerHTML = imgTag(m); } });
+  });
+}
+// Kaputtes Foto: erst die Original-Vorschau versuchen, dann zurück zum Hasen.
+document.addEventListener('error', e => {
+  const im = e.target, pic = im.tagName === 'IMG' && im.closest('.pic'); if (!pic) return;
+  if (im.dataset.alt && im.src !== im.dataset.alt) { im.src = im.dataset.alt; return; }
+  const p = BY_ID[pic.dataset.pic]; pic.classList.add('ph'); pic.innerHTML = rabbit(...RB_FOR(p));
+}, true);
+const isPlace = p => p.area !== 'überall';
+const mapsQ = p => encodeURIComponent(`${p.name} ${p.area} Tschechien`);
+const linksHTML = p => !isPlace(p) ? '' : `<div class="actions links">
+  <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${mapsQ(p)}">Google Maps</a>
+  <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking">Route</a>
+  <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${mapsQ(p)}">Fotos</a></div>`;
+
 // ---------- Cards ----------
 function card(p) {
   const v = S.visited.includes(p.id), f = S.fav.includes(p.id);
   return `<article class="card ${p.cat}" data-id="${p.id}">
+    ${picHTML(p)}
     <h3>${CAT[p.cat].icon}<span>${esc(p.name)}</span></h3>
     <div class="meta"><span>${esc(p.area)}</span>
       ${p.diet === 'vegan' ? '<span class="tag vegan">vegan</span>' : p.diet === 'veg' ? '<span class="tag veg">vegetarisch</span>' : ''}
@@ -98,8 +142,7 @@ function card(p) {
       <button class="btn small ${f ? 'on' : ''}" data-a="fav">${f ? '★ Favorit' : '☆ Favorit'}</button>
       <button class="btn small ${planned(p.id) ? 'on' : ''}" data-a="plan">${planned(p.id) ? '✓ Im Plan' : '+ Plan'}</button>
       <button class="btn small ${v ? 'on' : ''}" data-a="visit">${v ? 'Zurücksetzen' : 'Einchecken'}</button>
-      <a class="btn small" style="text-decoration:none;text-align:center" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}">Route</a>
-    </div></article>`;
+    </div>${linksHTML(p)}</article>`;
 }
 function bindCards(root) {
   root.onclick = e => {
@@ -111,14 +154,14 @@ function bindCards(root) {
 function renderList() {
   const items = PLACES.filter(p => matches(p, S.filter));
   const el = $('#list');
-  el.innerHTML = items.map(card).join('') || '<div class="empty">Keine Treffer.</div>';
-  bindCards(el);
+  el.innerHTML = items.map(card).join('') || `<div class="empty">${rabbit('orange', 'stop', 'rb-empty')}<br>Keine Treffer.</div>`;
+  bindCards(el); hydrate(el);
 }
 function openPlace(id) {
   const p = BY_ID[id];
   $('#sheet-body').innerHTML = card(p) + '<button class="btn" id="sheet-close" style="width:100%">Schließen</button>';
   $('#sheet-body').onclick = e => { if (e.target.id === 'sheet-close') return closeSheet(); bindClick(e); };
-  $('#sheet').hidden = false;
+  $('#sheet').hidden = false; hydrate($('#sheet-body'));
   function bindClick(e) {
     const b = e.target.closest('[data-a]'); if (!b) return;
     ({ fav: () => toggleFav(id), plan: () => pickDay(id), visit: () => checkIn(id) })[b.dataset.a]();
@@ -168,7 +211,7 @@ function renderPlan() {
         <div class="actions"><button class="btn small" data-m="-1">↑</button><button class="btn small" data-m="1">↓</button><button class="btn small" data-m="x">✕ Entfernen</button></div></article>`;
     }).join('');
     const route = ids.length ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/${ids.map(id => BY_ID[id].lat + ',' + BY_ID[id].lng).join('/')}/data=!4m2!4m1!3e2">Route</a>` : '';
-    return `<section class="day"><h2><span>${dayLabel(i)}</span><small>${ids.length} Stopps${dist ? ` · ${dist.toFixed(1)} km` : ''} ${route}</small></h2>${rows || '<div class="empty">Noch leer. Füge Orte über „Entdecken“ hinzu.</div>'}</section>`;
+    return `<section class="day"><h2><span>${dayLabel(i)}</span><small>${ids.length} Stopps${dist ? ` · ${dist.toFixed(1)} km` : ''} ${route}</small></h2>${rows || `<div class="empty">${rabbit('grey', 'point', 'rb-empty')}<br>Noch leer. Füge Orte über „Entdecken“ hinzu.</div>`}</section>`;
   }).join('');
 }
 $('#plan').onclick = e => {
@@ -226,8 +269,9 @@ $('#btn-dice').onclick = () => {
   const pool = PLACES.filter(p => p.cat !== 'kcd' && matches(p, S.filter === 'bar' || S.filter === 'veg' || S.filter === 'vegan' ? S.filter : 'all'));
   const roll = () => {
     const p = pool[Math.floor(Math.random() * pool.length)];
-    $('#sheet-body').innerHTML = `<h2>Das Schicksal wählt…</h2><div class="dice roll">⚄</div>` + card(p) +
+    $('#sheet-body').innerHTML = `<h2>Das Schicksal wählt…</h2><div class="dice roll">${rabbit('mustard', 'trumpet', 'rb-dice')}</div>` + card(p) +
       `<div class="row"><button class="btn gold" id="again">Nochmal würfeln</button><button class="btn" id="sheet-close">Schließen</button></div>`;
+    hydrate($('#sheet-body'));
     $('#sheet-body').onclick = e => {
       if (e.target.id === 'again') return roll();
       if (e.target.id === 'sheet-close') return closeSheet();
@@ -246,13 +290,16 @@ $('#btn-phrases').onclick = () => {
 };
 
 // ---------- Quest ----------
+const RANK_RB = [['mustard', 'stand'], ['grey', 'lens'], ['orange', 'point'], ['orange', 'stop'], ['red', 'guard'], ['mustard', 'burst']];
+const rankIdx = n => RANKS.reduce((r, [min], i) => n >= min ? i : r, 0);
 function rankOf(n) { let r = RANKS[0][1]; RANKS.forEach(([min, name]) => { if (n >= min) r = name; }); return r; }
 const renderRank = () => { $('#rank').innerHTML = `Rang<b>${rankOf(S.visited.length)}</b>${S.visited.length}/${PLACES.length} Orte`; };
 function renderQuest() {
   const sets = [['kcd', 'KCD-Schauplätze'], ['bar', 'Bars & Brauereien'], ['food', 'Veggie-Essen']];
   const pct = Math.round(S.visited.length / PLACES.length * 100);
-  $('#quest').className = 'quest'; $('#quest').innerHTML = `<h2 class="quest-title">${rankOf(S.visited.length)}</h2><div class="quest-sub">${S.visited.length} von ${PLACES.length} Orten besucht</div>
-    <div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>` +
+  $('#quest').className = 'quest'; $('#quest').innerHTML = `<div class="quest-head">${rabbit(...RANK_RB[rankIdx(S.visited.length)], 'rb-rank')}<div><h2 class="quest-title">${rankOf(S.visited.length)}</h2><div class="quest-sub">${S.visited.length} von ${PLACES.length} Orten besucht</div></div></div>
+    <div class="bar-out"><div class="bar-in" style="width:${pct}%"></div></div>
+    <div class="rb-row">${RANKS.map(([min, name], i) => `<div class="rb-slot ${S.visited.length >= min ? 'got' : ''}">${rabbit(...RANK_RB[i], 'rb-mini')}<span>${name}</span><small>ab ${min}</small></div>`).join('')}</div>` +
     sets.map(([c, l]) => {
       const ps = PLACES.filter(p => p.cat === c), n = ps.filter(p => S.visited.includes(p.id)).length;
       return `<h3><span>${l}</span><span>${n}/${ps.length}</span></h3>` +
@@ -360,6 +407,7 @@ $('#btn-group').onclick = openGroup;
 // ---------- Init ----------
 const hashRoom = (location.hash.match(/room=([a-z0-9]{8,40})/i) || [])[1];
 if (hashRoom && hashRoom.toLowerCase() !== S.room) { sync.join(hashRoom); toast('Gruppe beigetreten'); } else sync.start();
+$('#logo').innerHTML = rabbit('orange', 'guard', 'rb-logo');
 renderChips(); renderRank(); drawMarkers(); renderList(); renderPlan();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
